@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "main.tsx",
+    "vite.config.ts",
+    "app/model.ts",
+    "app/recap-source.ts",
+    "app/autofill.ts",
+    "app/report-model.ts",
+    "app/block-view.tsx",
+    "app/archive-client.ts",
+    "app/local-records.ts",
+    "app/workspace/workspace.tsx",
+    "app/workspace/sector-explorer.tsx",
+    "app/workspace/daily-report.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "app/api"
+  ]
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+outputs/
+*.tsbuildinfo
+.env*
+app/api/
+app/archive-server.ts
+app/chatgpt-auth.ts
+app/page.tsx
+app/layout.tsx
+app/workspace/page.tsx
