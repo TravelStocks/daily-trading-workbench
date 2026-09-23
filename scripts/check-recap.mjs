@@ -34,12 +34,16 @@ assert.throws(()=>saveRecord('2026-09-31',old,0));
 console.log('PASS: objective-only fill, provenance, manual and cleared answers preserved, archived/date isolation, durable storage, revision conflict, import migration and atomic validation');
 
 const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
-const {dailyIds,blockById,answered,recapBriefs,marketMetrics,cycleWindow}=await import(deskUrl);
+const {dailyIds,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
 assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,22);
 assert.equal(answered(emptyPaper(),dailyIds),0);assert.equal(answered({...emptyPaper(),answers:{f143:'复苏',f3:'摘要'}},dailyIds),2);
-const day=history.days.find(d=>d.date==='2026-09-22');assert.equal(recapBriefs(day).length,4);assert.equal(marketMetrics(day).find(([k])=>k==='最高连板')[1],'6');assert.equal(recapBriefs(undefined).length,0);assert(marketMetrics(undefined).every(([,v])=>v==='—'));
+const day=history.days.find(d=>d.date==='2026-09-22');assert.equal(recapBriefs(day).length,4);assert.equal(marketMetrics(day).find(([k])=>k==='高度板')[1],'6');assert.equal(recapBriefs(undefined).length,0);assert(marketMetrics(undefined).every(([,v])=>v==='—'));
 console.log('PASS: 22 original-field daily questions, shared progress, source-faithful briefs, missing-day metrics, complete source chapters in report');
 
 assert.equal(cycleWindow(history.days,'2026-09-23','20').at(-1).date,'2026-09-22','Missing recent day keeps recent cycle context');
 assert(cycleWindow(history.days,'2026-06-01','20').some(d=>d.date==='2026-06-01'));
 assert.equal(cycleWindow(history.days,'2026-09-22','all').length,history.days.length);
+const metrics=marketMetrics(day);assert.equal(metrics.length,13);assert.equal(new Set(metrics.map(([k])=>k)).size,13);
+assert.deepEqual(metrics.filter(([k])=>['沪指量能','断板','二板','深指'].includes(k)),[['深指','13723.74（-0.05%）'],['沪指量能','21356'],['二板','17'],['断板','18']]);
+const months=recapMonths(history.days);assert.equal(months[0].month,'2026-09');assert.equal(months[0].days[0].date,'2026-09-22');assert.equal(months.flatMap(m=>m.days).length,history.days.length);assert(months.every(m=>m.days.every(d=>d.date.startsWith(m.month))));
+console.log('PASS: complete 13 source metrics without aliases, newest-first month directory includes every recap');

@@ -21,9 +21,15 @@ export function cycleWindow<T extends {date:string}>(days:T[],date:string,range:
 export function marketMetrics(day?:Day){
  const entries=Object.entries(day?.metrics||{}),find=(pattern:RegExp)=>entries.find(([k])=>pattern.test(k))?.[1]||'—';
  return [
-  ['沪指',find(/沪指|上证/)],['成交额',find(/成交额|量能/)],['涨停 / 跌停',find(/极端腾落/).replace(/^(\d+)-(\d+)$/,'$1 / $2')],
-  ['上涨 / 下跌',find(/^(?!极端).*腾落数/).replace(/^(\d+)-(\d+)$/,'$1 / $2')],['最高连板',find(/高度板/)],['封板率',find(/封板率/)],
+  ['沪指',find(/^(沪指|上证)(?!量能)/)],['深指',find(/深指|深证/)],['创业',find(/创业/)],['科创',find(/科创/)],
+  ['沪指量能',find(/沪指量能|成交额|量能/)],['极端腾落数（涨停-跌停）',find(/极端腾落/)],['腾落数（上涨-下跌）',find(/^(?!极端).*腾落数/)],
+  ['一板',find(/^一板$/)],['二板',find(/^二板$/)],['三板',find(/^三板$/)],['高度板',find(/高度板/)],['封板率',find(/封板率/)],['断板',find(/^断板$/)],
  ];
+}
+export function recapMonths(days:Day[]){
+ const months=new Map<string,Day[]>();
+ for(const day of [...days].sort((a,b)=>b.date.localeCompare(a.date))){const month=day.date.slice(0,7);months.set(month,[...(months.get(month)||[]),day])}
+ return [...months].map(([month,days])=>({month,days}));
 }
 export function recapBriefs(day?:Day){
  const text=day?.sections?.find(s=>/复盘总纲|整体盘面/.test(s.title))?.text||'';
