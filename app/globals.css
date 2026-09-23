@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "./block-view.tsx";
+@source "./workspace";
+@source "../components/ui";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 :root{--background:#f3f5f8;--foreground:#1e2b40;--card:#fff;--card-foreground:#1e2b40;--popover:#fff;--popover-foreground:#1e2b40;--primary:#285bea;--primary-foreground:#fff;--secondary:#eaf0fd;--secondary-foreground:#285bea;--muted:#edf0f5;--muted-foreground:#65748a;--accent:#eaf0fd;--accent-foreground:#285bea;--destructive:#c43838;--border:#dfe5ef;--input:#d7dfeb;--ring:#285bea;--radius:.65rem;--sidebar:#101e35;--sidebar-foreground:#b9c6da;--sidebar-primary:#fff;--sidebar-primary-foreground:#101e35;--sidebar-accent:#223653;--sidebar-accent-foreground:#fff;--sidebar-border:#30415d;--sidebar-ring:#8daaff}
