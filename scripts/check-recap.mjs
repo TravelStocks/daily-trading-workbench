@@ -16,7 +16,7 @@ assert.equal(topFive([{date:'2026-01-01',sourceDate:'2026-01-01',name:'zero',str
 const dates=aroundDates(history.points,'2026-09-16',4,4);assert(dates.includes('2026-09-15')&&dates.includes('2026-09-22'));
 const fixture='<h2 class="chapter-title">一、复盘总纲</h2><p>原文&amp;证据</p><script>bad()</script><h2 class="chapter-title">三、板块强度</h2><table><tr><th>大题材板块</th><th>2026/1/1</th><th>次日节奏预测</th></tr><tr><td>电力</td><td>0（强回流）</td><td>等待确认</td></tr></table></main>';
 const parsed=recapPoints(fixture,'2026-01-01','https://example.test/');assert.equal(parsed[0].strength,0);assert.equal(parsed[0].next,'等待确认');assert(!recapSections(fixture)[0].text.includes('bad()'));assert(recapSections(fixture)[0].text.includes('原文&证据'));
-const p=emptyPaper();p.answers={f143:'主升',f3:'QA市场判断',f135:'QA执行',f164:'执行问题',f171:'QA修正'};p.review={cycle:'QA',body:'QA复盘补充',next:'QA明日条件',sectors:[]};assert(validatePaper(p));const report=buildReport('2026-09-22',p,history),md=reportMarkdown(report);assert.equal(report.sections.length,13);assert(md.includes('QA市场判断')&&md.includes('QA执行')&&md.includes('QA明日条件'));assert(md.includes('8048'));assert(report.sourceUrl.includes('2026.9.22'));
+const p=emptyPaper();p.answers={f143:'主升',f3:'QA市场判断',f135:'QA执行',f164:'执行问题',f171:'QA修正'};p.review={cycle:'QA',body:'QA复盘补充',next:'QA明日条件',sectors:[]};assert(validatePaper(p));const report=buildReport('2026-09-22',p,history),md=reportMarkdown(report);assert(report.sections.length>=13);assert(history.days.find(d=>d.date==='2026-09-22').sections.every(s=>report.sections.some(r=>r.source?.title===s.title)),'Complete report retains every source chapter');assert(md.includes('QA市场判断')&&md.includes('QA执行')&&md.includes('QA明日条件'));assert(md.includes('8048'));assert(report.sourceUrl.includes('2026.9.22'));
 const empty=buildReport('1900-01-01',emptyPaper(),history);assert.equal(empty.sections.filter(s=>s.missing).length,13);assert(!empty.sourceUrl);assert(!reportMarkdown(empty).includes('8048'));
 console.log('PASS: date-driven top five, changed rankings, no look-ahead, zero/missing values, before/after window, source parser, 13-module report, shared answers, no cross-date source leakage');
 
@@ -32,3 +32,14 @@ const old={...emptyPaper(),answers:{f3:'旧站个人答案'}};assert.equal(impor
 assert.throws(()=>importRecords([{date:'2026-09-23',paper:old},{date:'2026-09-24',paper:{broken:true}}]));assert.equal(readRecords().length,1,'Invalid import must be atomic');
 assert.throws(()=>saveRecord('2026-09-31',old,0));
 console.log('PASS: objective-only fill, provenance, manual and cleared answers preserved, archived/date isolation, durable storage, revision conflict, import migration and atomic validation');
+
+const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
+const {dailyIds,blockById,answered,recapBriefs,marketMetrics,cycleWindow}=await import(deskUrl);
+assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,22);
+assert.equal(answered(emptyPaper(),dailyIds),0);assert.equal(answered({...emptyPaper(),answers:{f143:'复苏',f3:'摘要'}},dailyIds),2);
+const day=history.days.find(d=>d.date==='2026-09-22');assert.equal(recapBriefs(day).length,4);assert.equal(marketMetrics(day).find(([k])=>k==='最高连板')[1],'6');assert.equal(recapBriefs(undefined).length,0);assert(marketMetrics(undefined).every(([,v])=>v==='—'));
+console.log('PASS: 22 original-field daily questions, shared progress, source-faithful briefs, missing-day metrics, complete source chapters in report');
+
+assert.equal(cycleWindow(history.days,'2026-09-23','20').at(-1).date,'2026-09-22','Missing recent day keeps recent cycle context');
+assert(cycleWindow(history.days,'2026-06-01','20').some(d=>d.date==='2026-06-01'));
+assert.equal(cycleWindow(history.days,'2026-09-22','all').length,history.days.length);

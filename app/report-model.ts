@@ -28,6 +28,9 @@ export function buildReport(date:string,p:Paper,archive:Archive):DailyReport{
   {title:'十二、明日核心票弱转强/转强确定+板块预期细化表',summary:join([a('f110')&&'我的转强确认定义：'+a('f110'),a('f111')&&'确认后的买点计划：'+a('f111')]),facts:facts(['f104_0_rating','f104_0_6','f104_1_rating','f104_1_6','f104_2_rating','f104_2_6','f105','f108','f109']),table:candidates.length?{headers:['核心票','量能预期','开盘预期','连板 / 形态预期','个股转强确认','板块预期'],rows:candidates.map(i=>[a(`f66_${i}_1`),'待补充','待补充','待补充','待补充',a(`f66_${i}_2`)||'待补充'])}:undefined,source:source(/预期细化|明日作战推演/)},
   {title:'十三、龙头预备票',summary:join([a('f99')&&'综合量价最有资格：'+a('f99'),a('f70')&&'最主动：'+a('f70'),a('f71')&&'最抗跌：'+a('f71'),a('f72')&&'回流最快：'+a('f72'),a('f73')&&'最能带动板块：'+a('f73')]),facts:facts(['f68','f69','f93','f94','f95','f96','f97','f98']),table:qualityRows.length?{headers:['标的','身位','领涨性','抗跌性','市场性','价值性','五维结论','100%异动监管距离','题材梯队完整性','题材持续性','筹码结构 / 量能备注'],rows:qualityRows}:undefined,source:source(/龙头预备票/)}
  ];
+ // Keep source-only chapters (oral notes, operation plans, etc.) in the complete report.
+ const usedSources=new Set(raw.map(s=>s.source?.title).filter(Boolean));
+ for(const extra of sourceDay?.sections||[])if(!usedSources.has(extra.title))raw.push({title:extra.title,summary:'',facts:[],source:extra});
  const sections=raw.map(s=>({...s,summary:s.summary==='。'?'':s.summary,missing:(!s.summary||s.summary==='。')&&!s.facts.length&&!s.table?.rows.length&&!s.source?.text}));
  const pending=sections.filter(s=>s.missing).map(s=>s.title);
  if(!a('f143'))pending.unshift('盘后情绪节点尚未填写');
