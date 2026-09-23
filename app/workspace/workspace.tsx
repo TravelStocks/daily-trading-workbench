@@ -1,11 +1,12 @@
 import {lazy,memo,Suspense,useEffect,useRef,useState} from 'react';
 import {BookOpen,Download,RefreshCw,ArrowUpRight,ChevronLeft,ChevronRight,ChevronDown,Check,Settings2} from 'lucide-react';
 import {emptyPaper,validDate,chinaDate,type Paper} from '../model';
-import {answer,answered,dailyIds,marketMetrics,recapBriefs,cycleWindow} from '../desk-model';
+import {answer,answered,dailyIds,marketMetrics,cycleWindow} from '../desk-model';
 import DailyQuestionnaire from './daily-questionnaire';
 import RecapDirectory from './recap-directory';
 import TradingRules from './trading-rules';
 import TradingHandbook from './trading-handbook';
+import RecapDigest from './recap-digest';
 import {loadArchive} from '../archive-client';
 import {readRecords,saveRecord,importRecords,storageKey,type Saved} from '../local-records';
 import {applyObjectiveFill} from '../autofill';
@@ -19,7 +20,7 @@ import './review-layout.css';
 const tone=(s:string)=>/分歧|退潮|冰点/.test(s)?'cold':/回流|修复|反弹/.test(s)?'return':/高潮|主升|发酵/.test(s)?'warm':'neutral';
 function download(name:string,value:unknown){const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 export default function Workspace(){
- const [archive,setArchive]=useState<Archive|null>(null),[records,setRecords]=useState<Saved[]>([]),[date,setDate]=useState(chinaDate()),[paper,setPaper]=useState<Paper>(emptyPaper),[ready,setReady]=useState(false),[status,setStatus]=useState('正在读取资料'),[error,setError]=useState(''),[syncing,setSyncing]=useState(false),[range,setRange]=useState('20'),[sourceOpen,setSourceOpen]=useState(true),[chapter,setChapter]=useState<number|null>(0),[showReport,setShowReport]=useState(false),[importNote,setImportNote]=useState('');
+ const [archive,setArchive]=useState<Archive|null>(null),[records,setRecords]=useState<Saved[]>([]),[date,setDate]=useState(chinaDate()),[paper,setPaper]=useState<Paper>(emptyPaper),[ready,setReady]=useState(false),[status,setStatus]=useState('正在读取资料'),[error,setError]=useState(''),[syncing,setSyncing]=useState(false),[range,setRange]=useState('20'),[sourceOpen,setSourceOpen]=useState(false),[chapter,setChapter]=useState<number|null>(0),[showReport,setShowReport]=useState(false),[importNote,setImportNote]=useState('');
  const state=useRef({date:chinaDate(),paper:emptyPaper(),revision:0,dirty:false}),readyRef=useRef(false),archiveRef=useRef<Archive|null>(null),busy=useRef(false),blocked=useRef(false),timer=useRef<ReturnType<typeof setTimeout>|null>(null),file=useRef<HTMLInputElement>(null),track=useRef<HTMLDivElement>(null);
  function flush(){const s=state.current;if(!s.dirty)return true;try{if(blocked.current)throw new Error('保存已暂停。请导出当前草稿，再刷新读取最新记录。');const saved=saveRecord(s.date,s.paper,s.revision);state.current={...s,revision:saved.revision,dirty:false};setRecords(readRecords());setStatus(s.paper.submitted?'已归档 · 保存在本机':'已自动保存到本机');setError('');return true}catch(e){blocked.current=true;setError((e as Error).message);setStatus('保存失败 · 请导出草稿');return false}}
  function select(d:string,a:Archive){if(!validDate(d)||!flush())return;try{const all=readRecords();setRecords(all);const saved=all.find(r=>r.date===d);const filled=applyObjectiveFill(saved?.paper||emptyPaper(),d,a);state.current={date:d,paper:filled.paper,revision:saved?.revision||0,dirty:filled.changed.length>0};setDate(d);setPaper(filled.paper);setStatus(filled.status==='archived'?'已归档 · 保留交卷时的答案':filled.status==='waiting'?'尚无可预填的同日资料':'同日客观项已核对');flush();const url=new URL(location.href);url.searchParams.set('date',d);history.replaceState(null,'',url)}catch(e){setError((e as Error).message)}}
@@ -35,7 +36,7 @@ export default function Workspace(){
  const days=[...nodes.values()].sort((a,b)=>a.date.localeCompare(b.date));
  const shown=cycleWindow(days,date,range);
  const dateList=[...new Set(days.map(d=>d.date).concat(date))].sort(),dateIndex=dateList.indexOf(date);
- const metrics=marketMetrics(day),briefs=recapBriefs(day),completed=answered(paper,dailyIds);
+ const metrics=marketMetrics(day),completed=answered(paper,dailyIds);
  const myCycle=answer(paper,'f143')||answer(paper,'f5');
  function goReport(){setShowReport(true);document.getElementById('report')?.scrollIntoView({behavior:'smooth'})}
  function submit(){state.current={...state.current,paper:{...state.current.paper,submitted:true},dirty:true};setPaper(state.current.paper);if(flush())goReport()}
@@ -51,7 +52,7 @@ export default function Workspace(){
  <ThemeExplorer archive={archive!} anchor={date}/>
  <TradingRules/>
  <TradingHandbook/>
- <section id="recap" className="recap-content"><div className="section-heading"><div><span className="section-kicker">{date} / 复盘原文</span><h2>当日复盘</h2><p>先读当天资料，再往下完成自己的判断。</p></div><a href="#exam" className="text-link">去做考卷 ↓</a></div><div className="recap-briefs">{briefs.map((b,i)=><article key={b.title}><small>0{i+1} / {b.title}</small><p>{b.text}</p></article>)}</div>{day?<div className="recap-source-bar"><span>以上为原复盘摘要，作为你的判断依据。</span><button aria-expanded={sourceOpen} onClick={()=>setSourceOpen(!sourceOpen)}>{sourceOpen?'收起原文':'在此阅读完整复盘'}<ChevronDown size={14}/></button><a href={day.url} target="_blank" rel="noreferrer">原页 ↗</a></div>:<div className="desk-empty">这一天的复盘还未发布。可以先写自己的判断，同日资料发布后会自动补充。</div>}
+ <section id="recap" className="recap-content"><div className="section-heading"><div><span className="section-kicker">{date} / 复盘浓缩版</span><h2>当日复盘 · 六项速览</h2><p>大盘、情绪、题材梯队、关注标的、四种场景与交易预案。</p></div><a href="#exam" className="text-link">去做考卷 ↓</a></div><RecapDigest day={day}/>{day?<div className="recap-source-bar"><span>浓缩版来自同日复盘，完整原文保留在下方。</span><button aria-expanded={sourceOpen} onClick={()=>setSourceOpen(!sourceOpen)}>{sourceOpen?'收起原文':'展开完整原文'}<ChevronDown size={14}/></button><a href={day.url} target="_blank" rel="noreferrer">原页 ↗</a></div>:<div className="desk-empty">这一天的复盘还未发布。可以先写自己的判断，同日资料发布后会自动补充。</div>}
  {sourceOpen&&<div className="source-reader">{day?.sections?.map((s,i)=><article key={s.title}><button aria-expanded={chapter===i} onClick={()=>setChapter(chapter===i?null:i)}>{s.title}<ChevronDown size={15}/></button>{chapter===i&&<p>{s.text}</p>}</article>)}</div>}
  </section>
  <DailyQuestionnaire paper={paper} day={day} change={change} edit={edit}/>

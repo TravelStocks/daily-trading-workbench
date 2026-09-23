@@ -65,3 +65,19 @@ assert.equal(profitModel(3,9,6).status,'偏弱观察');assert.equal(profitModel(
 assert.equal(inputNumber(''),undefined);assert.equal(inputNumber('  '),undefined);assert.equal(inputNumber('0'),0);assert.equal(profitModel(3,9).status,undefined);assert.equal(profitModel(3,9).safePrice,undefined);assert.equal(profitModel(3,9,0).status,'不能接受');
 assert.throws(()=>openingConditions(NaN));assert.throws(()=>openingConditions(5,0));assert.throws(()=>openingConditions(5,-1));assert.throws(()=>profitModel(3,3));assert.throws(()=>profitModel(3,9,10));
 console.log('PASS: preserved handbook inventory, original calculator outputs, interpolation, boundary protection, optional blanks distinct from zero, invalid-input and status thresholds');
+
+const digestUrl=moduleUrl(fs.readFileSync('app/recap-digest.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)));
+const {baseDigest,parseDigest}=await import(digestUrl);
+const html22=fs.readFileSync('scripts/fixtures/recap-2026-09-22.html','utf8'),html23=fs.readFileSync('scripts/fixtures/recap-2026-09-23.html','utf8');
+const digest22=parseDigest(html22,day),digest23=parseDigest(html23,{date:'2026-09-23',label:'',summary:''});
+assert.equal(digest22.headlines.market,'放量横盘，题材内部换挡。');assert.equal(digest22.headlines.emotion,'高潮后的正常分歧。');
+assert.equal(digest22.scenarios.length,4);assert.deepEqual(digest22.scenarios.map(s=>s.name),['主线加强','分歧回流','退潮切换','全面退潮']);
+assert(digest22.scenarios.every(s=>s.signal&&s.action&&s.exit),'Keep both entry confirmation and retreat conditions');
+assert.equal(digest22.stocks.length,8);assert(digest22.stocks.some(s=>s.name==='华软科技'&&s.level==='R级风险'),'Risk-watch stocks must not be converted to buy candidates');
+assert.equal(digest22.themes.length,4);assert(digest22.themes[0].ladder.some(s=>s.name==='内蒙新华'&&s.board.includes('5板')));
+assert.equal(digest22.plans.length,6);assert(digest22.plans[0].entry.includes('五进六缩量转强'));assert(digest22.plans[0].maxLoss.includes('待填'),'Do not invent a position or stop-loss number');
+assert.equal(digest23.date,'2026-09-23');assert.equal(digest23.scenarios.length,4);assert.notEqual(digest23.headlines.market,digest22.headlines.market);assert.notDeepEqual(digest23.plans,digest22.plans);
+assert.throws(()=>parseDigest(html23,day),/日期不匹配/);assert.throws(()=>parseDigest('<title>Unknown</title>',day),/日期不匹配/);
+const missing=baseDigest();assert.equal(missing.scenarios.length,0);assert.equal(missing.plans.length,0);assert(!JSON.stringify(missing).includes('内蒙新华'));
+const partial=parseDigest('<body data-review-date="2026-09-22"><script type="application/json" data-plan-defaults>invalid</script></body>',day);assert.equal(partial.plans.length,0);assert.equal(partial.headlines.market,'放量横盘，题材内部换挡。');
+console.log('PASS: six-part recap digest from real dated fixtures, full scenario conditions, theme ladder, original stock grades, plan risk caveats, missing-data and cross-date protection');
