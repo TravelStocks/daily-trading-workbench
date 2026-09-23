@@ -47,3 +47,21 @@ const metrics=marketMetrics(day);assert.equal(metrics.length,13);assert.equal(ne
 assert.deepEqual(metrics.filter(([k])=>['沪指量能','断板','二板','深指'].includes(k)),[['深指','13723.74（-0.05%）'],['沪指量能','21356'],['二板','17'],['断板','18']]);
 const months=recapMonths(history.days);assert.equal(months[0].month,'2026-09');assert.equal(months[0].days[0].date,'2026-09-22');assert.equal(months.flatMap(m=>m.days).length,history.days.length);assert(months.every(m=>m.days.every(d=>d.date.startsWith(m.month))));
 console.log('PASS: complete 13 source metrics without aliases, newest-first month directory includes every recap');
+
+const handbook=JSON.parse(fs.readFileSync('app/handbook.json','utf8'));
+assert.equal(handbook.profile.groups.length,2);assert.equal(handbook.expectation.rows.length,6);assert(handbook.expectation.rows.every(r=>r.length===5));
+const knowledgeTitles=['弱修复卖点','强回流确认','大中军启动信号','退潮期禁忌','对流题材节奏','吸血题材识别','高潮次日分歧预期','一字核心带动回流','盘中三冰反核','科创共振锚','二高潮做T','恐惧反弹准备','极致高潮次日刻度','龙头分歧看后排一字','监管日后排助攻','ETF适用边界','同身位唯一性与量能确认'];
+assert(knowledgeTitles.every(t=>handbook.knowledge.cards.some(c=>c.title===t&&c.text)),'All existing knowledge must survive redesigns');
+assert.deepEqual(handbook.rhythm.stages.map(s=>s.cards.length),[4,4,6,6]);assert.equal(handbook.stats.length,5);
+assert(handbook.research.url.startsWith(handbook.source+'pages/'));assert(handbook.cycle.image.startsWith(handbook.source+'assets/emotion-cycle.png'));
+assert(handbook.knowledge.cards.every(c=>!c.emphasis||c.text.includes(c.emphasis)));
+const {openingRows,openingConditions,profitModel,inputNumber}=await import(moduleUrl(fs.readFileSync('app/limit-up-model.ts','utf8')));
+const near=(a,b)=>assert(Math.abs(a-b)<1e-9,`${a} differs from ${b}`);
+for(const [x,low,drawdown,amp] of openingRows){const r=openingConditions(x);near(r.minLow,low);near(r.openToLow,drawdown);near(r.amp,amp);assert.equal(r.protectivePrice,undefined)}
+near(openingConditions(5,10).protectivePrice,10.16);near(openingConditions(4.5).minLow,1.2);assert.equal(openingConditions(-3).clampedOpen,-2);assert.equal(openingConditions(11).clampedOpen,10);
+// Golden outputs from the original skill CLI (open=3, high=9, previous close=10).
+const profit=profitModel(3,9,7,10);near(profit.safe,6.57);near(profit.hard,5.496);near(profit.safePrice,10.657);near(profit.hardPrice,10.5496);assert.equal(profit.status,'强承接');
+assert.equal(profitModel(3,9,6).status,'偏弱观察');assert.equal(profitModel(3,9,5).status,'不能接受');assert.equal(profitModel(3,9,profit.safe).status,'强承接');assert.equal(profitModel(3,9,profit.hard).status,'偏弱观察');
+assert.equal(inputNumber(''),undefined);assert.equal(inputNumber('  '),undefined);assert.equal(inputNumber('0'),0);assert.equal(profitModel(3,9).status,undefined);assert.equal(profitModel(3,9).safePrice,undefined);assert.equal(profitModel(3,9,0).status,'不能接受');
+assert.throws(()=>openingConditions(NaN));assert.throws(()=>openingConditions(5,0));assert.throws(()=>openingConditions(5,-1));assert.throws(()=>profitModel(3,3));assert.throws(()=>profitModel(3,9,10));
+console.log('PASS: preserved handbook inventory, original calculator outputs, interpolation, boundary protection, optional blanks distinct from zero, invalid-input and status thresholds');
