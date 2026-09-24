@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowUp,ArrowUpRight} from 'lucide-react';
 
-const sections=[['overview','市场概览'],['themes','题材强度'],['handbook','交易手册'],['recap','复盘速览'],['exam','决策考卷'],['report','汇总报告']];
+const sections=[['overview','市场概览'],['themes','题材强度'],['recap','每日复盘'],['exam','决策考卷'],['report','汇总报告'],['handbook','交易手册']];
 
 export default function PageNavigation({ready,completed,total}:{ready:boolean;completed:number;total:number}){
  const [active,setActive]=useState('overview');
