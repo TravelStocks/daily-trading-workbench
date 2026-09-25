@@ -1,0 +1,28 @@
+import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
+import {matchingBoards,pct,snapshot,type MarketContext,type Quote} from '../market-context';
+import './market-context.css';
+const Context=createContext<{data:MarketContext|null;error:boolean}>({data:null,error:false});
+export function MarketContextProvider({children}:{children:ReactNode}){
+ const [data,setData]=useState<MarketContext|null>(null),[error,setError]=useState(false);
+ useEffect(()=>{let active=true;const controller=new AbortController();async function read(){const urls=import.meta.env.DEV?[`${import.meta.env.BASE_URL}data/market-context.json`]:['https://raw.githubusercontent.com/TravelStocks/daily-trading-workbench/main/public/data/market-context.json',`${import.meta.env.BASE_URL}data/market-context.json`];for(const url of urls){try{const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])});if(!r.ok)throw Error();const j=await r.json();if(j.version!==1||!Array.isArray(j.quotes)||!j.themes)throw Error();if(active){setData(j);setError(false)}return}catch{if(controller.signal.aborted)return}}if(active)setError(true)}void read();const timer=setInterval(()=>void read(),120000);return()=>{active=false;controller.abort();clearInterval(timer)}},[]);
+ return <Context.Provider value={{data,error}}>{children}</Context.Provider>;
+}
+function QuoteValue({q,date,index=false}:{q:Quote;date:string;index?:boolean}){
+ const row=snapshot(q,date);
+ return <div className={index?'foreign-index':'foreign-quote'}><div><a href={q.source} target="_blank" rel="noreferrer" title={`${q.provider} · 查看原始行情`}>{q.name} ↗</a>{!index&&<small>{q.theme}</small>}</div><div><strong className={row?(row.pct>0?'market-up':row.pct<0?'market-down':''):''}>{row?pct(row.pct):'待收盘'}</strong><small>{row?row.close.toLocaleString('zh-CN',{maximumFractionDigits:2}):'—'}</small></div><time>{row?.date.slice(5)||'待更新'}{row&&row.date<date&&<small>最近可用</small>}</time></div>;
+}
+function ThemeDirection({quotes,date}:{quotes:Quote[];date:string}){
+ const groups=[...new Set(quotes.map(q=>q.theme))].map(theme=>({theme,rows:quotes.filter(q=>q.theme===theme).map(q=>snapshot(q,date)).filter(r=>r!=null)})).filter(g=>g.rows.length&&new Set(g.rows.map(r=>r.date)).size===1);
+ return <div className="foreign-directions" aria-label="观察样本题材表现">{groups.map(g=><span key={g.theme}>{g.theme}<b>{g.rows.filter(r=>r.pct>0).length}涨 / {g.rows.filter(r=>r.pct<0).length}跌</b><small>{g.rows[0].date.slice(5)}</small></span>)}<small>观察股样本，非板块全量统计</small></div>;
+}
+export default function ExternalMarkets({date}:{date:string}){
+ const {data,error}=useContext(Context);
+ return <section id="external" className="external-markets"><div className="external-heading"><div><span className="section-kicker">次日盘前 / 外围观察</span><h2>外围市场情况</h2><p>{date} 复盘 · 美股包含当晚交易日收盘；港、韩、日股取当日或此前最近收盘。</p></div><span className="external-status">{data?'收盘行情':'正在读取'}</span></div>
+ {!data?<p className="external-empty" role="status">{error?'行情暂时无法读取，请稍后刷新。':'正在整理美股、韩股、港股与日股行情…'}</p>:<><div className="foreign-regions">{[['US','美股','三大指数 · AI与科技观察'],['KR','韩股','KOSPI · 半导体重点观察'],['HK','港股','恒生双指数 · 科技与医药'],['JP','日股','日经指数']].map(([id,title,note])=>{const all=data.quotes.filter(q=>q.region===id),stocks=all.filter(q=>q.theme!=='指数');return <article key={id} className={'foreign-region region-'+id}><div className="foreign-region-title"><h3>{title}</h3><span>{note}</span></div><div className="foreign-indices">{all.filter(q=>q.theme==='指数').map(q=><QuoteValue q={q} date={date} index key={q.id}/>)}</div>{stocks.length>0&&<><ThemeDirection quotes={stocks} date={date}/><div className="foreign-table-head"><span>重点观察股 / 题材</span><span>涨跌幅 / 收盘价</span><span>交易日</span></div>{stocks.map(q=><QuoteValue q={q} date={date} key={q.id}/>)}</>}{id==='JP'&&<p className="foreign-note">日韩日期早于所选日时，显示最近取得的收盘数据；不补算缺失交易日的涨跌。</p>}</article>})}</div><details className="foreign-method"><summary>数据时点与观察范围</summary><p>美股以纽约交易日期匹配所选复盘日，含当晚收盘；收盘前显示此前最近收盘。港、韩、日股不引用所选日之后的行情。各行同时展示真实交易日，历史查看不会混入最新行情。涨跌幅为日涨跌，韩股按前一交易日收盘计算；价格单位为当地货币，指数为点。</p><p>个股是固定重点观察名单，题材标签用于观察代表股表现，并非全市场人气排名或板块指数。来源：东方财富日线、Naver / KRX；点击名称查看原始数据。公开行情每日定时采集，采集失败保留上次数据。</p><p>最近采集：{new Date(data.updatedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）{error?' · 本次刷新失败，保留已读取资料':''}</p></details></>}
+ </section>;
+}
+export function ThemeTotals({name,date}:{name:string;date:string}){
+ const {data}=useContext(Context),rows=matchingBoards(name,data?.themes[date]||[]);
+ if(/退潮|断板反馈/.test(name))return <p className="theme-total-note">风险观察分组，不作为统计板块。</p>;
+ return <div className="theme-totals"><div className="theme-total-head"><span>对应板块 · {date.slice(5)}</span><span>涨停数</span><span>总成交额</span></div>{rows.length?rows.map(b=><div className="theme-total-row" key={b.id}><span>{b.name}</span><a href={b.source} target="_blank" rel="noreferrer" title="同花顺热门板块榜；未返回的数据保留待核">{b.limitUps==null?'待核':`${b.limitUps} 家`} ↗</a><a href={b.amountSource} target="_blank" rel="noreferrer" title="板块全部成分股成交额，同花顺日线">{b.turnover==null?'待核':`${(b.turnover/1e8).toFixed(2)} 亿`} ↗</a></div>):<p className="theme-total-note">同日板块统计待补充；不以核心标的数量代替总数。</p>}<small>同花顺板块口径；成交额覆盖全板块。板块可重叠，不相加；未入涨停榜记为待核。</small></div>;
+}

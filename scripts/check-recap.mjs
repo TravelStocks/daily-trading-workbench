@@ -107,3 +107,16 @@ assert.throws(()=>parseVoiceFill(voiceJson,'2026-09-22'),/日期/);
 assert.throws(()=>parseVoiceFill('x'.repeat(60001),'2026-09-23'),/60000/);
 assert(parseVoiceFill('收盘周期是退潮，收盘周期是修复','2026-09-23').notes.some(n=>n.includes('多次')));
 console.log('PASS: same-day highest-board names, tied leaders, missing/failed-board safety, voice text matching, valid JSON import, date guard and selected-only answer updates');
+
+const contextUrl=moduleUrl(fs.readFileSync('app/market-context.ts','utf8'));
+const {snapshot,matchingBoards}=await import(contextUrl);
+assert.equal(snapshot({rows:[{date:'2026-09-23',pct:2},{date:'2026-09-22',pct:0}]},'2026-09-22').pct,0);
+assert.equal(snapshot({rows:[{date:'2026-09-23',pct:2}]},'2026-09-21'),undefined);
+const context=JSON.parse(fs.readFileSync('public/data/market-context.json','utf8'));
+const matched=matchingBoards('PCB/复合铜箔/芯片/通信',context.themes['2026-09-23']);
+assert.equal(matched.length,5);assert.equal(matched.find(b=>b.name==='PCB概念').limitUps,6);
+assert.equal(matched.find(b=>b.name==='PET铜箔').limitUps,null);
+assert.equal(matchingBoards('高位退潮与断板反馈',context.themes['2026-09-23']).length,0);
+assert(context.quotes.filter(q=>q.region==='HK').length>=8);
+assert(context.quotes.every(q=>q.rows.every(r=>Number.isFinite(r.close)&&Number.isFinite(r.pct))));
+console.log('PASS: historical overseas cutoff, zero/missing, HK coverage, constituent theme matching and risk-only groups');
