@@ -109,7 +109,7 @@ assert(parseVoiceFill('收盘周期是退潮，收盘周期是修复','2026-09-2
 console.log('PASS: same-day highest-board names, tied leaders, missing/failed-board safety, voice text matching, valid JSON import, date guard and selected-only answer updates');
 
 const contextUrl=moduleUrl(fs.readFileSync('app/market-context.ts','utf8'));
-const {snapshot,matchingBoards}=await import(contextUrl);
+const {snapshot,matchingBoards,matchingLimitUps}=await import(contextUrl);
 assert.equal(snapshot({rows:[{date:'2026-09-23',pct:2},{date:'2026-09-22',pct:0}]},'2026-09-22').pct,0);
 assert.equal(snapshot({rows:[{date:'2026-09-23',pct:2}]},'2026-09-21'),undefined);
 const context=JSON.parse(fs.readFileSync('public/data/market-context.json','utf8'));
@@ -120,3 +120,14 @@ assert.equal(matchingBoards('高位退潮与断板反馈',context.themes['2026-0
 assert(context.quotes.filter(q=>q.region==='HK').length>=8);
 assert(context.quotes.every(q=>q.rows.every(r=>Number.isFinite(r.close)&&Number.isFinite(r.pct))));
 console.log('PASS: historical overseas cutoff, zero/missing, HK coverage, constituent theme matching and risk-only groups');
+
+const dx=context.limitUpDays['2026-09-23'];
+assert.equal(dx.groups.find(g=>g.name==='PCB产业链').count,5);
+assert.deepEqual(matchingLimitUps('PCB/复合铜箔/芯片/通信',dx.groups).map(g=>g.name),['算力/半导体产业链','PCB产业链']);
+assert.equal(matchingLimitUps('房地产',dx.groups)[0].count,5);
+assert.equal(matchingLimitUps('医药',dx.groups)[0].count,2);
+assert.equal(matchingLimitUps('高位退潮与断板反馈',dx.groups).length,0);
+assert.equal(matchingLimitUps('通信',dx.groups).length,0,'Absent independent category is not zero or semiconductor count');
+assert.equal(context.limitUpDays['2026-09-25'],undefined,'Unpublished date stays empty');
+assert(Object.values(context.limitUpDays).every(d=>d.groups.every(g=>g.count===new Set(g.stocks.map(s=>s.code)).size)));
+console.log('PASS: Duanxianxia real-date counts, source-preserving group aliases, no false subgroup counts and complete stock reconciliation');

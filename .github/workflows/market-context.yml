@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test scripts/market-data.test.mjs
+      - run: node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs
       - run: node scripts/sync-market-context.mjs
       - name: Commit public observations
         run: |

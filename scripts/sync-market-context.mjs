@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import {instruments,boards,parseKlines,parseNaver,parseBoard,completed} from './market-data.mjs';
+import {fetchLimitUps} from './duanxianxia.mjs';
 const path='public/data/market-context.json',now=new Date(),end=now.toISOString().slice(0,10).replaceAll('-','');
 const old=await fs.readFile(path,'utf8').then(JSON.parse).catch(()=>({quotes:[],themes:{}}));
-const result={version:1,updatedAt:now.toISOString(),quotes:[...old.quotes],themes:{...old.themes},errors:[]};
+const result={version:1,updatedAt:now.toISOString(),quotes:[...old.quotes],themes:{...old.themes},limitUpDays:{...old.limitUpDays},errors:[]};
 async function get(url,json=false){const r=await fetch(url,{signal:AbortSignal.timeout(18000),headers:{'User-Agent':'Mozilla/5.0'}});if(!r.ok)throw Error(`HTTP ${r.status}`);return json?r.json():r.text()}
 async function batch(items,fn){for(let i=0;i<items.length;i+=4)await Promise.all(items.slice(i,i+4).map(async x=>{try{await fn(x)}catch(e){result.errors.push(`${x[1]||x}: ${e.message}`)}}))}
 await batch(instruments,async ([region,id,name,theme])=>{
@@ -17,6 +18,9 @@ const history=JSON.parse(await fs.readFile('public/data/history.json','utf8'));
 const since=new Date(now.getTime()-45*86400000).toISOString().slice(0,10);
 const dates=new Set(history.days.map(d=>d.date).filter(d=>d>=since));
 for(let i=0;i<14;i++){const d=new Date(now.getTime()-i*86400000);if(d.getUTCDay()!==0&&d.getUTCDay()!==6)dates.add(d.toISOString().slice(0,10))}
+// Backfill the recap archive once, then refresh recent dates independently of THS.
+const limitDates=new Set([...dates,...history.days.filter(d=>!result.limitUpDays[d.date]).map(d=>d.date)]);
+await batch([...limitDates].filter(d=>completed(d,'HK',now)).sort().map(d=>[d]),async ([date])=>{result.limitUpDays[date]={...await fetchLimitUps(date),updatedAt:now.toISOString()}});
 const amounts={};await batch(boards,async ([id])=>{amounts[id]={};for(const year of new Set([...dates].map(d=>d.slice(0,4))))Object.assign(amounts[id],parseBoard(await get(`https://d.10jqka.com.cn/v6/line/bk_${id}/01/${year}.js`)))});
 const pendingAmounts=new Map();
 await batch([...dates].filter(d=>completed(d,'HK',now)).sort().map(d=>[d]),async ([date])=>{
@@ -30,8 +34,9 @@ await batch([...dates].filter(d=>completed(d,'HK',now)).sort().map(d=>[d]),async
  for(const [id] of extra){const key=id+'-'+date.slice(0,4);if(!pendingAmounts.has(key))pendingAmounts.set(key,(async()=>{try{Object.assign(amounts[id]||=( {}),parseBoard(await get(`https://d.10jqka.com.cn/v6/line/bk_${id}/01/${date.slice(0,4)}.js`)))}catch{result.errors.push(`${key}: board turnover unavailable`)}})());await pendingAmounts.get(key)}
  result.themes[date]=[...boards,...extra].map(([id,name,aliases])=>{const b=j.data.find(b=>String(b.code)===id),prior=old.themes[date]?.find(b=>b.id===id);return {id,name,aliases,limitUps:typeof b?.limit_up_num==='number'?b.limit_up_num:null,turnover:amounts[id]?.[date]??prior?.turnover??null,source,amountSource:`https://d.10jqka.com.cn/v6/line/bk_${id}/01/${date.slice(0,4)}.js`}});
 });
-if(!result.quotes.some(q=>q.updatedAt===now.toISOString()))throw Error('All overseas sources failed; retain previously published data');
+if(!result.quotes.some(q=>q.updatedAt===now.toISOString())&&!Object.values(result.limitUpDays).some(d=>d.updatedAt===now.toISOString()))throw Error('All sources failed; retain previously published data');
 result.quotes.sort((a,b)=>instruments.findIndex(q=>q[1]===a.id)-instruments.findIndex(q=>q[1]===b.id));
 await fs.mkdir('public/data',{recursive:true});await fs.writeFile(path,JSON.stringify(result));
 await fs.mkdir('docs/data',{recursive:true});await fs.writeFile('docs/data/market-context.json',JSON.stringify(result));
 console.log(`Collected ${result.quotes.length} instruments, ${Object.keys(result.themes).length} theme dates. ${result.errors.length} source errors.`);if(result.errors.length)console.log(result.errors.join('\n'));
+console.log(`Duanxianxia: ${Object.keys(result.limitUpDays).length} dated recaps, ${Object.values(result.limitUpDays).filter(d=>d.updatedAt===now.toISOString()).length} refreshed.`);

@@ -1,5 +1,5 @@
 import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
-import {matchingBoards,pct,snapshot,type MarketContext,type Quote} from '../market-context';
+import {matchingBoards,matchingLimitUps,pct,snapshot,type MarketContext,type Quote} from '../market-context';
 import './market-context.css';
 const Context=createContext<{data:MarketContext|null;error:boolean}>({data:null,error:false});
 export function MarketContextProvider({children}:{children:ReactNode}){
@@ -23,6 +23,7 @@ export default function ExternalMarkets({date}:{date:string}){
 }
 export function ThemeTotals({name,date}:{name:string;date:string}){
  const {data}=useContext(Context),rows=matchingBoards(name,data?.themes[date]||[]);
+ const sourceDay=data?.limitUpDays?.[date],day=sourceDay?.date===date?sourceDay:undefined,groups=matchingLimitUps(name,day?.groups||[]);
  if(/退潮|断板反馈/.test(name))return <p className="theme-total-note">风险观察分组，不作为统计板块。</p>;
- return <div className="theme-totals"><div className="theme-total-head"><span>对应板块 · {date.slice(5)}</span><span>涨停数</span><span>总成交额</span></div>{rows.length?rows.map(b=><div className="theme-total-row" key={b.id}><span>{b.name}</span><a href={b.source} target="_blank" rel="noreferrer" title="同花顺热门板块榜；未返回的数据保留待核">{b.limitUps==null?'待核':`${b.limitUps} 家`} ↗</a><a href={b.amountSource} target="_blank" rel="noreferrer" title="板块全部成分股成交额，同花顺日线">{b.turnover==null?'待核':`${(b.turnover/1e8).toFixed(2)} 亿`} ↗</a></div>):<p className="theme-total-note">同日板块统计待补充；不以核心标的数量代替总数。</p>}<small>同花顺板块口径；成交额覆盖全板块。板块可重叠，不相加；未入涨停榜记为待核。</small></div>;
+ return <div className="theme-totals"><div className="dx-count-heading"><strong>涨停家数 · 短线侠</strong><span>{date.slice(5)} · 自动获取</span></div>{groups.length?groups.map(g=><details className="dx-count-group" key={g.name}><summary><span>{g.name}</span><b>{g.count} 家</b></summary><p>{g.stocks.map(s=>`${s.name} ${s.code}`).join(' / ')}</p></details>):<p className="theme-total-note">{day?'短线侠当日未单列匹配分类，可查看当日全部分类。':'短线侠同日复盘尚未取得，发布后自动补充。'}</p>}{day&&<div className="dx-count-source"><a href={day.source} target="_blank" rel="noreferrer" title="短线侠原站打开后，请选择同一复盘日期">短线侠原页 ↗</a><details><summary>当日全部分类</summary><div>{day.groups.map(g=><span key={g.name}>{g.name}<b>{g.count} 家</b></span>)}</div></details></div>}<small>按短线侠原始分类统计；复合分类不拆分、不相加，点击家数可核对个股。</small><div className="theme-total-head amount-only"><span>全板块成交额 · 同花顺</span><span>亿元</span></div>{rows.length?rows.map(b=><div className="theme-total-row amount-only" key={b.id}><span>{b.name}</span><a href={b.amountSource} target="_blank" rel="noreferrer" title="板块全部成分股成交额，同花顺日线">{b.turnover==null?'待核':`${(b.turnover/1e8).toFixed(2)} 亿`} ↗</a></div>):<p className="theme-total-note">同日成交额待补充。</p>}<small>成交额为同花顺对应板块全量口径，与上方短线侠分类分别列示。</small></div>;
 }

@@ -74,6 +74,8 @@ Node.js >=22.13；`npm ci`，`npm test`，`npm run build`。
 
 `node scripts/sync-market-context.mjs` 更新公开 JSON。GitHub Actions 在北京时间 08:15、17:15（周一至周六，调度可能延迟）采集并提交；前端优先读取仓库 raw 数据，每 2 分钟检查，失败回退随站点发布的快照。因此自动采集不依赖 Actions 提交再次触发 Pages 构建。只有公开行情进入仓库；个人答卷不涉及采集。
 
-题材梯队按同花顺对应板块逐项展示涨停数与全板块成交额（亿元）。组合题材有交叉，禁止相加。热门板块涨停接口只返回排行榜，未返回的板块涨停数为 null / 待核，不能视为零；风险观察分组不作为板块。当前金额覆盖已映射板块，未映射或无同日数据时提示待补充。接口失败保留已有历史，日期校验拒绝接口默默回退到其他交易日的数据。
+题材梯队涨停家数自动取短线侠按概念涨停复盘：先 POST getFupanDate 确认请求日已有复盘，再 POST getFupanByYidong（type=plate, date=YYYY-MM-DD）。保留原始分类与个股名单，分类家数必须与去重个股数一致；拒绝日期回退、明细残缺和重复分类。首次补齐历史复盘，以后随现有 GitHub Actions 任务每日刷新最近日期，无需手动提供。来源暂时失败保留同日已核实记录，未发布日期不引用前日数据。页面可展开核对个股和当日全部分类。
 
-验证：`node --test scripts/market-data.test.mjs` 和 `npm test`，再运行 `npm run build`。
+短线侠分类与同花顺板块范围不同，因此涨停数和成交额分别呈现；复合分类（例如算力/半导体产业链）不拆成独立细分家数，分类之间也不相加。成交额继续取同花顺对应板块全量日线，显示亿元。未匹配到短线侠独立分类时明确提示未单列，不补零；风险观察分组不作为统计板块。
+
+验证：`node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs` 和 `npm test`，再运行 `npm run build`。
