@@ -2,6 +2,7 @@ import {createContext,useContext,useEffect,useState,type ReactNode} from 'react'
 import {matchingBoards,matchingLimitUps,pct,snapshot,type MarketContext,type Quote} from '../market-context';
 import './market-context.css';
 const Context=createContext<{data:MarketContext|null;error:boolean}>({data:null,error:false});
+export const useMarketContext=()=>useContext(Context);
 export function MarketContextProvider({children}:{children:ReactNode}){
  const [data,setData]=useState<MarketContext|null>(null),[error,setError]=useState(false);
  useEffect(()=>{let active=true;const controller=new AbortController();async function read(){const urls=import.meta.env.DEV?[`${import.meta.env.BASE_URL}data/market-context.json`]:['https://raw.githubusercontent.com/TravelStocks/daily-trading-workbench/main/public/data/market-context.json',`${import.meta.env.BASE_URL}data/market-context.json`];for(const url of urls){try{const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])});if(!r.ok)throw Error();const j=await r.json();if(j.version!==1||!Array.isArray(j.quotes)||!j.themes)throw Error();if(active){setData(j);setError(false)}return}catch{if(controller.signal.aborted)return}}if(active)setError(true)}void read();const timer=setInterval(()=>void read(),120000);return()=>{active=false;controller.abort();clearInterval(timer)}},[]);
