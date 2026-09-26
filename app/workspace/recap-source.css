@@ -1,0 +1,85 @@
+/* Make the complete daily recap a clear reading destination. */
+.recap-source-bar {
+  justify-content: space-between;
+  margin: 4px 24px 22px;
+  padding: 15px 16px;
+  border: 1px solid #cfe2d7;
+  border-left: 4px solid #16805f;
+  border-radius: 6px;
+  background: #f5faf7;
+}
+
+.recap-source-copy,
+.recap-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recap-source-copy { min-width: 230px; }
+.recap-source-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 5px;
+  background: #dff0e8;
+  color: #147257;
+}
+.recap-source-copy b {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #274e3d;
+}
+.recap-source-copy small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #698075;
+}
+.recap-source-actions { margin-left: auto; }
+.recap-source-bar .recap-source-expand,
+.recap-source-bar .recap-source-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.recap-source-expand {
+  border: 1px solid #cddfd5;
+  color: #436756 !important;
+  background: #fff;
+}
+.recap-source-primary {
+  border: 1px solid #14785a;
+  color: #fff !important;
+  background: #14785a;
+}
+.recap-source-primary:hover { background: #0f684d; }
+
+@media (max-width: 620px) {
+  .recap-source-bar {
+    margin: 4px 14px 18px;
+    padding: 13px;
+    gap: 12px;
+  }
+  .recap-source-copy,
+  .recap-source-actions { width: 100%; }
+  .recap-source-actions {
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .recap-source-bar .recap-source-expand,
+  .recap-source-bar .recap-source-primary {
+    width: 100%;
+    min-height: 44px;
+  }
+}
