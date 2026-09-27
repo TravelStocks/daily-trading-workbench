@@ -7,7 +7,18 @@ const sourceUrl=moduleUrl(fs.readFileSync('app/recap-source.ts','utf8'));
 const reportUrl=moduleUrl(fs.readFileSync('app/report-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./recap-source'",JSON.stringify(sourceUrl)));
 const {topFive,aroundDates,recapPoints,recapSections}=await import(sourceUrl);
 const {buildReport,reportMarkdown}=await import(reportUrl);
-const {emptyPaper,validatePaper}=await import(modelUrl);
+const {emptyPaper,validatePaper,fields,markdown}=await import(modelUrl);
+const mainModes=['连板接力','弱转强','分歧低吸','反核','半路','打板','趋势持股','容量核心','抱团核心','20cm','ETF','轻仓','空仓'];
+assert.deepEqual(fields.get('f38').options,mainModes);
+assert.equal(fields.get('f38').multi,false);
+for(const mode of mainModes){
+ const paper=JSON.parse(JSON.stringify({...emptyPaper(),answers:{f38:mode}}));
+ assert(validatePaper(paper),`Main mode must round-trip: ${mode}`);
+ assert(markdown('2026-09-23',paper).includes('**今天我的主模式**：'+mode));
+}
+assert(!validatePaper({...emptyPaper(),answers:{f38:['轻仓','反核']}}),'Main mode remains single-select');
+assert(!validatePaper({...emptyPaper(),answers:{f38:'未知模式'}}));
+console.log('PASS: all 13 main modes, saved-answer compatibility, single-select validation and export');
 const history=JSON.parse(fs.readFileSync('app/workspace/history.json','utf8'));
 assert.deepEqual(topFive(history.points,'2026-09-22').map(p=>p.name),['AI应用','芯片','医疗','算力','并购重组']);
 assert.deepEqual(topFive(history.points,'2026-09-16').map(p=>p.name),['通信','芯片','化工','算力','机器人']);
