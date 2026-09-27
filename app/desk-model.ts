@@ -1,9 +1,10 @@
 import {fields,sections,type Paper,type Block} from './model';
 import type {Day} from './recap-source';
 import {candidateRows,nextDayFields,leaderFields} from './required-candidates';
+import {requiredMarketFields} from './required-reviews';
 
 export const dailyGroups=[
- {title:'市场与周期',subtitle:'一次定调，不再反复判断周期',ids:['f143','f3','f24'],optional:['f36','f37'],source:/市场风格|赚钱效应/,hint:'周期、盘面依据、主要风险各写一次。赚钱与亏钱模式可按需补充。'},
+ {title:'市场与周期',subtitle:'市场风格与赚钱效应每日必填',ids:['f143','f3','f36','f37','f24'],optional:[],source:/市场风格|赚钱效应/,hint:'市场风格、赚钱效应、亏钱效应三项必填，各写判断与依据。自动带入的最高板数据不代替分析；暂无明确效应时说明观察依据。'},
  {title:'题材与主线',subtitle:'选出主线，说清依据',ids:['f60','f62'],optional:['f47','f48','f49'],source:/各主线|各板块|题材详细/,hint:'把持续性、核心反馈与分歧承接写进同一条依据，不必重复填写三个题材的整套问题。'},
  {title:'核心与龙头',subtitle:'选谁，以及竞争是否结束',ids:['f170','f76'],optional:['f70','f71'],source:/龙头预备票|核心关键票/,hint:'候选资料自动带入；逐票预期与核验在下方两个每日必填模块填写，不重复作答。'},
  {title:'明日计划',subtitle:'模式、仓位、参与、退出',ids:['f38','f116','f110','f127'],optional:['f104','f112'],source:/明日作战推演|大盘明日/,hint:'四项组成一份可执行预案，不再要求把同样内容重写成最终结论。'},
@@ -18,7 +19,8 @@ export const factualGroups=[
  {title:'龙头候选池',ids:['f66']},
 ] as const;
 const questionLabels:Record<string,string>={
- f143:'收盘情绪周期',f3:'盘面定调与最关键的依据',f24:'当前最大的市场风险',
+ f143:'收盘情绪周期',f24:'当前最大的市场风险',
+ ...Object.fromEntries(requiredMarketFields.map(f=>[f.id,f.label])),
  f60:'我认定的主线（没有则写无）',f62:'主线成立的依据与失效信号',
  f170:'我认定的第一核心（未确定可写观察中）',f76:'龙头竞争是否结束',
  f38:'我的参与模式',f116:'明日仓位上限',f110:'满足什么条件才参与',f127:'出现什么信号减仓或退出',
@@ -26,7 +28,7 @@ const questionLabels:Record<string,string>={
 };
 export function questionBlock(id:string):Block{
  const b=blockById.get(id)!;
- return {...b,label:questionLabels[id]||b.label,placeholder:['f135','f165','f171'].includes(id)?'等待同日复盘自动摘录；原文缺失时留空，不自动编写。':b.placeholder,long:b.type==='text'&&['f3','f62','f110','f127','f135','f165','f171'].includes(id)?true:b.long};
+ return {...b,label:questionLabels[id]||b.label,placeholder:requiredMarketFields.some(f=>f.id===id)?'写明判断与同日依据；暂无明确效应时说明原因，不只填“无”或“待补充”。':['f135','f165','f171'].includes(id)?'等待同日复盘自动摘录；原文缺失时留空，不自动编写。':b.placeholder,long:b.type==='text'&&['f3','f36','f37','f62','f110','f127','f135','f165','f171'].includes(id)?true:b.long};
 }
 export const answer=(p:Paper,id:string)=>{const v=p.answers[id];return Array.isArray(v)?v.join('、'):v||''};
 export const answered=(p:Paper,ids:readonly string[])=>ids.filter(id=>!!answer(p,id)).length;

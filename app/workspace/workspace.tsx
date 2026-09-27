@@ -11,7 +11,7 @@ import RecapDigest from './recap-digest';
 import OralReview from './oral-review';
 import ExternalMarkets,{MarketContextProvider} from './market-context';
 import {marketLeaders} from '../market-leaders';
-import {requiredCandidateReview} from '../required-candidates';
+import {requiredDailyReviews} from '../required-reviews';
 import {loadArchive} from '../archive-client';
 import {readRecords,saveRecord,importRecords,storageKey,type Saved} from '../local-records';
 import {applyObjectiveFill} from '../autofill';
@@ -52,10 +52,10 @@ export default function Workspace(){
  const leaders=heights.get(date);
  const myCycle=answer(paper,'f143')||answer(paper,'f5');
  function goReport(){setShowReport(true);document.getElementById('report')?.scrollIntoView({behavior:'smooth'})}
- const requiredGroups=requiredCandidateReview(paper),requiredComplete=requiredGroups.filter(g=>g.complete).length;
+ const requiredGroups=requiredDailyReviews(paper),requiredComplete=requiredGroups.filter(g=>g.complete).length;
  const requiredMissing=requiredGroups.flatMap(g=>g.missing),requiredAttempted=requiredAttemptDate===date;
  function submit(){
-  const missing=requiredCandidateReview(state.current.paper).flatMap(g=>g.missing);
+  const missing=requiredDailyReviews(state.current.paper).flatMap(g=>g.missing);
   setRequiredAttemptDate(state.current.date);
   if(missing.length){flush();document.getElementById(missing[0].id)?.focus();return;}
   state.current={...state.current,paper:{...state.current.paper,submitted:true},dirty:true};setPaper(state.current.paper);if(flush())goReport();
@@ -77,9 +77,9 @@ export default function Workspace(){
  {sourceOpen&&<div className="source-reader">{day?.sections?.map((s,i)=><article key={s.title}><button aria-expanded={chapter===i} onClick={()=>setChapter(chapter===i?null:i)}>{s.title}<ChevronDown size={15}/></button>{chapter===i&&<p>{s.text}</p>}</article>)}</div>}
  <OralReview key={date} date={date} paper={paper} edit={edit}/>
  </section>
- {requiredAttempted&&requiredMissing.length>0&&<div className="required-review-notice" role="alert">尚不能交卷归档：两个每日必填模块还有 {requiredMissing.length} 项未完成。请先补充「{requiredMissing[0].label}」；草稿仍按原规则自动保存。<a href={'#'+requiredMissing[0].id}>前往首个未填项</a></div>}
+ {requiredAttempted&&requiredMissing.length>0&&<div className="required-review-notice" role="alert">尚不能交卷归档：每日必填模块还有 {requiredMissing.length} 项未完成。请先补充「{requiredMissing[0].label}」；草稿仍按原规则自动保存。<a href={'#'+requiredMissing[0].id}>前往首个未填项</a></div>}
  <DailyQuestionnaire paper={paper} day={day} date={date} change={change} edit={edit} requiredAttempted={requiredAttempted}/>
- <section id="report" className="report-desk"><div className="section-heading"><div><span className="section-kicker">第三步 / 汇总与归档</span><h2>你的判断，汇成这一天的报告</h2><p>同日复盘作为资料底稿，个人答案补进相应章节。修改后自动更新。</p></div><span className={'report-state '+(paper.submitted?'submitted':'')}>{paper.submitted?'已归档':'填写中'}</span></div><div className="report-preview"><div className="report-preview-top"><BookOpen size={24}/><div><span>{date} / DAILY REVIEW</span><h3>{answer(paper,'f3')||'市场判断与交易复盘'}</h3></div></div><div className="conclusion-grid">{[['收盘周期',answer(paper,'f143')||answer(paper,'f5')],['我的主线',answer(paper,'f60')],['核心标的',answer(paper,'f170')],['仓位上限',answer(paper,'f116')]].map(([k,v])=><div key={k}><small>{k}</small><strong className={v?'':'pending-value'}>{v||'待你判断'}</strong></div>)}</div><div className="report-next"><small>明日预案</small><p>{personalPlan(paper)||paper.review?.next||'填写参与模式、仓位上限、参与和退出条件后，会自动汇总在这里。'}</p></div><div className="report-footer"><span>{completed} / {dailyIds.length} 个日常问题已填 · 逐票必填模块 {requiredComplete} / 2</span><button className="secondary-button" aria-expanded={showReport} onClick={()=>setShowReport(!showReport)}>{showReport?'收起完整报告':'展开完整报告 / 导出'}</button><button className="primary-button" onClick={submit}>{paper.submitted?'保存并查看报告':'交卷并归档'}<ArrowUpRight size={16}/></button></div></div>{showReport&&<Suspense fallback={<div className="desk-loading">正在整理完整报告…</div>}><DailyReport date={date} paper={paper} archive={archive!} onEdit={()=>document.getElementById('exam')?.scrollIntoView({behavior:'smooth'})}/></Suspense>}</section>
+ <section id="report" className="report-desk"><div className="section-heading"><div><span className="section-kicker">第三步 / 汇总与归档</span><h2>你的判断，汇成这一天的报告</h2><p>同日复盘作为资料底稿，个人答案补进相应章节。修改后自动更新。</p></div><span className={'report-state '+(paper.submitted?'submitted':'')}>{paper.submitted?'已归档':'填写中'}</span></div><div className="report-preview"><div className="report-preview-top"><BookOpen size={24}/><div><span>{date} / DAILY REVIEW</span><h3>{answer(paper,'f3')||'市场判断与交易复盘'}</h3></div></div><div className="conclusion-grid">{[['收盘周期',answer(paper,'f143')||answer(paper,'f5')],['我的主线',answer(paper,'f60')],['核心标的',answer(paper,'f170')],['仓位上限',answer(paper,'f116')]].map(([k,v])=><div key={k}><small>{k}</small><strong className={v?'':'pending-value'}>{v||'待你判断'}</strong></div>)}</div><div className="report-next"><small>明日预案</small><p>{personalPlan(paper)||paper.review?.next||'填写参与模式、仓位上限、参与和退出条件后，会自动汇总在这里。'}</p></div><div className="report-footer"><span>{completed} / {dailyIds.length} 个日常问题已填 · 每日必填模块 {requiredComplete} / {requiredGroups.length}</span><button className="secondary-button" aria-expanded={showReport} onClick={()=>setShowReport(!showReport)}>{showReport?'收起完整报告':'展开完整报告 / 导出'}</button><button className="primary-button" onClick={submit}>{paper.submitted?'保存并查看报告':'交卷并归档'}<ArrowUpRight size={16}/></button></div></div>{showReport&&<Suspense fallback={<div className="desk-loading">正在整理完整报告…</div>}><DailyReport date={date} paper={paper} archive={archive!} onEdit={()=>document.getElementById('exam')?.scrollIntoView({behavior:'smooth'})}/></Suspense>}</section>
  </>}
  <footer className="desk-footer"><span>交易日课 · 资料自动整理，判断留给自己。</span><span>资料截至 {archive?.latest||'—'} · 页面打开时每 2 分钟检查更新</span></footer><details className="migration-note"><summary>备份与旧站迁移说明</summary><p>个人答案只保存在当前浏览器，不上传公开仓库。旧工作台的完整 JSON 备份可从右上角“数据”导入；本机已有个人作答的同日记录会保留。</p><a href="https://daily-trading-exam-raymond.raymond-blackfire.chatgpt.site/" target="_blank" rel="noreferrer">打开旧工作台导出备份 ↗</a></details>
  </main></div></div></MarketContextProvider>

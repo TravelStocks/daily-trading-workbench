@@ -26,4 +26,6 @@
 .candidate-review-empty>p{color:#52675f;font-size:15px;line-height:1.8;margin:0 0 20px}
 .required-review-notice{border:1px solid #d0a58f;background:#fff8f3;color:#713d26;padding:18px 22px;margin:24px 0;border-radius:6px;font-size:16px;line-height:1.8}
 .required-review-notice a{display:inline-block;margin-left:12px;color:inherit;text-underline-offset:4px;min-height:44px;line-height:44px}
+.decision-fields textarea[aria-required=true]{scroll-margin-top:140px}
+.desk-app .decision-fields textarea[aria-invalid=true]{border-color:#b34b37}
 @media(max-width:760px){.candidate-review-module>header{padding:22px 18px;gap:10px;flex-wrap:wrap}.candidate-review-module>header>div{flex:1;min-width:180px}.candidate-review-intro{padding:16px 18px;display:block}.candidate-review-card{margin:18px}.candidate-review-grid{grid-template-columns:1fr;padding:18px;gap:24px}.candidate-review-identity{padding:18px}.candidate-review-empty{padding:20px 18px}.candidate-review-field label{font-size:16px}}

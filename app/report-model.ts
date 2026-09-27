@@ -1,6 +1,7 @@
 import {fields,personalPlan,type Paper} from './model';
 import {topFive,type Archive, type SourceSection} from './recap-source';
-import {candidateRows as activeCandidateRows,nextDayFields,requiredCandidateReview} from './required-candidates';
+import {candidateRows as activeCandidateRows,nextDayFields} from './required-candidates';
+import {requiredDailyReviews} from './required-reviews';
 export type ReportSection={title:string;summary:string;facts:[string,string][];table?:{headers:string[];rows:string[][]};source?:SourceSection;missing:boolean};
 export type DailyReport={date:string;title:string;sections:ReportSection[];sourceUrl?:string;sourceTitle?:string;pending:string[];answered:number;submitted:boolean;appendix:[string,string][]};
 const text=(p:Paper,key:string)=>{const v=p.answers[key];return Array.isArray(v)?v.join('、'):v||''};
@@ -10,14 +11,14 @@ export function buildReport(date:string,p:Paper,archive:Archive):DailyReport{
  const facts=(ids:string[])=>ids.map(id=>[fields.get(id)?.label||id,a(id)] as [string,string]).filter(([,v])=>v);
  const top=topFive(archive.points,date),days=[...new Set(archive.points.map(x=>x.date))].filter(d=>d<=date).sort().slice(-4);
  const pointMap=new Map(archive.points.map(x=>[x.date+'|'+x.name,x]));
- const candidates=activeCandidateRows(p),requiredGroups=requiredCandidateReview(p);
+ const candidates=activeCandidateRows(p),requiredGroups=requiredDailyReviews(p);
  const candidateRows=candidates.map(i=>[a(`f66_${i}_1`),a(`f66_${i}_2`),a(`f66_${i}_3`),a(`f66_${i}_4`)].map(v=>v||'待补充'));
  const qualityRows=candidates.map(i=>[a(`f66_${i}_1`),a(`f66_${i}_3`),...[1,2,0,5,4,3,6].map(d=>a(`f67_${d}_${i+1}`)),...[1,2,3,4].map(c=>a(`f188_${i}_${c}`)),a(['f80','f84','f88','f92'][i])].map(v=>v||'待补充'));
  const join=(parts:string[])=>parts.filter(Boolean).join('；')+'。';
  const plan=personalPlan(p);
  const raw:Omit<ReportSection,'missing'>[]=[
   {title:'一、复盘总纲',summary:join([first('f3'),first('f143','f5')&&'收盘周期：'+first('f143','f5'),first('f60','f148')&&'主线：'+first('f60','f148'),first('f38','f175')&&'主模式：'+first('f38','f175'),a('f1')&&'实际总仓位：'+a('f1')]),facts:facts(['f172','f173','f174','f176','f177','f178','f179','f180']),source:source(/复盘总纲|整体盘面|情绪定调/)},
-  {title:'二、市场风格与赚钱效应解析',summary:join([first('f36','f146','f25')&&'市场奖励：'+first('f36','f146','f25'),first('f37','f147','f28')&&'亏钱集中在：'+first('f37','f147','f28'),a('f39')&&'模式选择依据：'+a('f39')]),facts:facts(['f6','f7','f8','f9','f12','f13','f14','f15','f16','f17','f18','f20','f21','f22','f26','f27','f35']),source:source(/市场风格|赚钱效应/)},
+  {title:'二、市场风格与赚钱效应解析',summary:join([a('f3')&&'市场风格与依据：'+a('f3'),first('f36','f146','f25')&&'市场奖励：'+first('f36','f146','f25'),first('f37','f147','f28')&&'亏钱集中在：'+first('f37','f147','f28'),a('f39')&&'模式选择依据：'+a('f39')]),facts:facts(['f6','f7','f8','f9','f12','f13','f14','f15','f16','f17','f18','f20','f21','f22','f26','f27','f35']),source:source(/市场风格|赚钱效应/)},
   {title:'三、近4日板块强度+次日节奏预测表',summary:top.length?`${date} 原始强度前 ${top.length} 名依次为：${top.map(s=>s.name+'（'+s.strength+' / '+(s.state||'节奏未标注')+'）').join('、')}。`:'',facts:[],table:top.length?{headers:['题材',...days,'次日节奏预测','原文核心判断'],rows:top.map(s=>[s.name,...days.map(d=>pointMap.get(d+'|'+s.name)?.raw||'未提供'),s.next||'未提供',s.judgment||'未提供'])}:undefined,source:source(/板块强度|题材强度/)},
   {title:'四、今日操作结果+核心失误+核心反思',summary:join([a('f135')&&'实际执行：'+a('f135'),a('f164')&&'最大错误：'+a('f164'),a('f165')&&'主要问题：'+a('f165'),first('f171','f186')&&'下一次修正：'+first('f171','f186')]),facts:facts(['f1','f2','f133','f134','f136','f137','f138','f139','f140','f141','f142','f143','f144','f145','f150','f151','f152','f156','f157','f158','f162','f163']),source:source(/今日操作结果|今日操作复盘/)},
   {title:'五、操作与情绪复盘（KISS模型）',summary:join([first('f171','f186')&&'Improve · 首要改进：'+first('f171','f186'),a('f140')&&'Stop · 已记录的模式外交易：'+a('f140')]),facts:[...facts(['f181','f182','f183','f184','f185']),...(p.review?.body?[['补充复盘与反思',p.review.body] as [string,string]]:[])],source:source(/KISS|操作与情绪/)},
