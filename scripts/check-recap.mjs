@@ -4,7 +4,9 @@ import ts from 'typescript';
 const moduleUrl=source=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
 const modelUrl=moduleUrl(fs.readFileSync('app/model.ts','utf8').replace("import raw from './exam.json';",'const raw='+fs.readFileSync('app/exam.json','utf8')+';'));
 const sourceUrl=moduleUrl(fs.readFileSync('app/recap-source.ts','utf8'));
-const reportUrl=moduleUrl(fs.readFileSync('app/report-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./recap-source'",JSON.stringify(sourceUrl)));
+const requiredUrl=moduleUrl(fs.readFileSync('app/required-candidates.ts','utf8'));
+const {requiredCandidateReview,nextDayFields,leaderFields,reviewValueComplete,candidateRows}=await import(requiredUrl);
+const reportUrl=moduleUrl(fs.readFileSync('app/report-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)));
 const {topFive,aroundDates,recapPoints,recapSections}=await import(sourceUrl);
 const {buildReport,reportMarkdown}=await import(reportUrl);
 const {emptyPaper,validatePaper,fields,markdown}=await import(modelUrl);
@@ -56,7 +58,7 @@ assert.equal(applyPromotionFill({...emptyPaper(),submitted:true},promotion.date,
 assert.equal(applyPromotionFill(emptyPaper(),promotion.date,{...promotion,rows:promotion.rows.map(r=>({...r,success:99}))}).changed,false);
 console.log('PASS: automatic promotion cells, factual commentary, date isolation, no subjective answers, manual/archive protection');
 
-const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
+const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)));
 const {dailyIds,optionalIds,factualGroups,questionBlock,legacyAnswerGroups,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
 assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,14);
 assert.equal(answered(emptyPaper(),dailyIds),0);assert.equal(answered({...emptyPaper(),answers:{f143:'复苏',f3:'摘要'}},dailyIds),2);
@@ -109,7 +111,7 @@ assert.equal(inputNumber(''),undefined);assert.equal(inputNumber('  '),undefined
 assert.throws(()=>openingConditions(NaN));assert.throws(()=>openingConditions(5,0));assert.throws(()=>openingConditions(5,-1));assert.throws(()=>profitModel(3,3));assert.throws(()=>profitModel(3,9,10));
 console.log('PASS: preserved handbook inventory, original calculator outputs, interpolation, boundary protection, optional blanks distinct from zero, invalid-input and status thresholds');
 
-const candidateUrl=moduleUrl(fs.readFileSync('app/leader-candidates.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)));
+const candidateUrl=moduleUrl(fs.readFileSync('app/leader-candidates.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)));
 const executionUrl=moduleUrl(fs.readFileSync('app/execution-reflection.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)));
 const digestUrl=moduleUrl(fs.readFileSync('app/recap-digest.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./leader-candidates'",JSON.stringify(candidateUrl)).replace("'./execution-reflection'",JSON.stringify(executionUrl)));
 const {baseDigest,parseDigest}=await import(digestUrl);
@@ -296,3 +298,52 @@ assert.equal(Object.keys(allWithExecution.autoFill).length,32);assert(validatePa
 assert(validatePaper(JSON.parse(JSON.stringify(execFilled.paper))));assert(markdown(candidateDay.date,execFilled.paper).includes('三组条件单分批退出'));
 assert(reportMarkdown(buildReport(candidateDay.date,execFilled.paper,history)).includes(execution23.f171.value));
 console.log('PASS: dated narrative/table/KISS extraction, concise source order, no invented trades or plans, manual/clear/archive guards, all 32 provenance entries and report/export persistence');
+
+// Mandatory detail checks are submission rules, not destructive storage migrations.
+assert(!optionalIds.includes('f67'),'Seven-dimensional comparison is no longer optional');
+assert(requiredCandidateReview(emptyPaper()).every(g=>!g.complete));
+for(const value of ['', '  ', '待补充', '待核', '—', '暂无', '无', '不确定', 'N/A'])assert(!reviewValueComplete(value),value);
+assert(reviewValueComplete('待核：缺少区间偏离值，盘前核对公告和指数基准'));
+assert.deepEqual(candidateRows({...emptyPaper(),answers:{f66_0_1:'无',f66_1_1:'待补充',f66_2_1:'候选测试'}}),[2]);
+const requiredPaper={...emptyPaper(),answers:{f66_0_1:'必填测试A',f66_0_2:'测试题材A',f66_0_3:'3板',f66_2_1:'必填测试C',f66_2_2:'测试题材C',f66_2_3:'4板'}};
+const originalRequired=JSON.stringify(requiredPaper);
+assert.deepEqual(requiredCandidateReview(requiredPaper).map(g=>[g.filled,g.total]),[[0,10],[0,24]],'Only named candidates count; do not require four names');
+assert.equal(JSON.stringify(requiredPaper),originalRequired);
+for(const row of [0,2])for(const field of [...nextDayFields(row),...leaderFields(row)]){
+ assert(fields.has(field.id),'Every rendered field must persist: '+field.id);
+ requiredPaper.answers[field.id]=`${row===0?'A':'C'} ${field.label}：已记录证据和核验条件`;
+}
+assert(requiredCandidateReview(requiredPaper).every(g=>g.complete));
+assert(validatePaper(JSON.parse(JSON.stringify(requiredPaper))));
+const filledRequiredReport=buildReport('2026-09-24',requiredPaper,history);
+assert.deepEqual(filledRequiredReport.sections[11].table.rows[0],[requiredPaper.answers.f66_0_1,...nextDayFields(0).map(f=>requiredPaper.answers[f.id])]);
+assert.equal(filledRequiredReport.sections[11].table.rows[0].at(-1),requiredPaper.answers.f187_0_5,'Theme name is not a theme expectation');
+assert.equal(filledRequiredReport.sections[12].table.headers.length,filledRequiredReport.sections[12].table.rows[0].length);
+for(const row of [0,2])for(const field of [...nextDayFields(row),...leaderFields(row)]){
+ assert(reportMarkdown(filledRequiredReport).includes(requiredPaper.answers[field.id]));
+ assert(markdown('2026-09-24',requiredPaper).includes(requiredPaper.answers[field.id]));
+ const incomplete={...requiredPaper,answers:{...requiredPaper.answers,[field.id]:'待补充'}};
+ assert(requiredCandidateReview(incomplete).some(g=>!g.complete),'Each field gates submission: '+field.id);
+}
+assert(!filledRequiredReport.pending.some(s=>s.includes('每日必填')));
+assert.deepEqual(legacyAnswerGroups(requiredPaper),[],'Required fields are not duplicated in legacy/optional panels');
+const orphan={...requiredPaper,answers:{...requiredPaper.answers,f66_0_1:''}};
+assert(legacyAnswerGroups(orphan).some(g=>g.blocks.some(b=>b.id==='f187_0_1')),'Removing a name must not make old row answers inaccessible');
+const noCandidates={...emptyPaper(),answers:{f189:'没有合格候选：同身位竞争未结束，缺少持续领涨证据',f190:'明日只观察：等分歧承接与板块带动同时确认再重新评估'}};
+assert(requiredCandidateReview(noCandidates).every(g=>g.complete));
+const noneReport=buildReport('2026-09-24',noCandidates,history);
+assert.equal(noneReport.sections[11].facts[0][1],noCandidates.answers.f190);
+assert.equal(noneReport.sections[12].facts[0][1],noCandidates.answers.f189);
+assert(!noneReport.sections[11].table&&!noneReport.sections[12].table,'Do not fabricate stocks');
+assert(requiredCandidateReview({...noCandidates,answers:{...noCandidates.answers,f66_0_1:'新增候选'}}).some(g=>!g.complete),'No-candidate notes do not bypass active candidates');
+assert(validatePaper({...emptyPaper(),submitted:true}),'Old archives remain readable without new fields');
+for(const field of [...nextDayFields(0),...leaderFields(0)]){
+ const authored={...leadersFilled.paper,answers:{...leadersFilled.paper.answers,[field.id]:'已写依据'}};
+ const changed=applyLeaderCandidateFill(authored,candidateDay.date,candidateDay,reversed).paper;
+ assert.equal(changed.answers.f66_0_1,authored.answers.f66_0_1,'Autofill must not reassign reviewed row: '+field.id);
+ assert.equal(changed.answers[field.id],'已写依据');
+}
+saveRecord('2026-09-24',requiredPaper,0);
+assert.deepEqual(readRecords().find(r=>r.date==='2026-09-24').paper.answers,requiredPaper.answers);
+assert(!readRecords().find(r=>r.date==='2026-09-22').paper.answers.f187_0_1,'New details stay in their selected date');
+console.log('PASS: two daily required modules, every field gated, all report columns wired, explicit no-candidate path, source row protection, legacy compatibility, full exports and dated persistence');

@@ -1,5 +1,6 @@
 import {plain,tables,type Day} from './recap-source';
 import type {Paper,AutoEntry} from './model';
+import {hasCandidateReview} from './required-candidates';
 
 export type LeaderCandidate={name:string;theme:string;board:string;logic:string};
 export type LeaderPool={candidates:LeaderCandidate[];available:boolean};
@@ -57,8 +58,8 @@ export function parseLeaderCandidates(html:string):LeaderPool{
 
 export function candidateRowProtected(paper:Paper,row:number){
  for(let col=1;col<=4;col++){const id=`f66_${row}_${col}`,prior=paper.autoFill?.[id],current=paper.answers[id];if(prior?current!==prior.value:Boolean(current))return true;}
- // A row with authored seven-dimension scores must not silently change identity.
- return Object.entries(paper.answers).some(([id,v])=>new RegExp(`^f67_\\d+_${row+1}$`).test(id)&&Boolean(v));
+ // Authored expectations and verification must stay paired with the same stock.
+ return hasCandidateReview(paper,row);
 }
 
 export function applyLeaderCandidateFill(paper:Paper,date:string,day:Day|undefined,pool:LeaderPool|undefined){
