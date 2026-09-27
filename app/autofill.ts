@@ -1,6 +1,6 @@
 import type {AutoEntry,Paper} from './model';
 import {topFive,type Archive} from './recap-source';
-// Only this allowlist can be machine-filled. Judgment, trades, exposure and reflection stay human-owned.
+// Objective market defaults only. Explicit recap transcription uses separate source-gated fillers.
 export const objectiveFields=['f6','f40','f50','f55'] as const;
 export function objectiveCandidates(date:string,archive:Archive){const day=archive.days.find(d=>d.date===date);const candidates:Record<string,AutoEntry>={};if(!day?.url)return candidates;const add=(key:string,value:string,evidence:string)=>{candidates[key]={value,sourceDate:date,sourceUrl:day.url!,evidence}};
  const height=day.metrics?.['高度板'];if(height&&/^\d+(?:板)?$/.test(height))add('f6',height.replace(/板$/,'')+'板','当日市场表 · 高度板：'+height);

@@ -6,7 +6,7 @@ export const dailyGroups=[
  {title:'题材与主线',subtitle:'选出主线，说清依据',ids:['f60','f62'],optional:['f47','f48','f49'],source:/各主线|各板块|题材详细/,hint:'把持续性、核心反馈与分歧承接写进同一条依据，不必重复填写三个题材的整套问题。'},
  {title:'核心与龙头',subtitle:'选谁，以及竞争是否结束',ids:['f170','f76'],optional:['f70','f71','f67'],source:/龙头预备票|核心关键票/,hint:'候选资料自动带入；选出的核心及竞争状态由你判断，允许暂时没有核心。'},
  {title:'明日计划',subtitle:'模式、仓位、参与、退出',ids:['f38','f116','f110','f127'],optional:['f104','f112'],source:/明日作战推演|大盘明日/,hint:'四项组成一份可执行预案，不再要求把同样内容重写成最终结论。'},
- {title:'执行与反思',subtitle:'操作结果、一个问题、一个改进',ids:['f135','f165','f171'],optional:['f1','f2','f139'],source:/今日操作结果|今日操作复盘/,hint:'只记实际发生的操作与结果。抓住最重要的一处问题；没有交易或错误也可以如实写明。'},
+ {title:'执行与反思',subtitle:'同日复盘自动摘录，可随时校正',ids:['f135','f165','f171'],optional:['f1','f2','f139'],source:/今日操作结果|今日操作复盘/,hint:'自动读取操作结果、核心失误及 KISS 改进项，不必重复填写。只摘录原文；手动修改和已归档答案保持不变。'},
 ] as const;
 export const blockById=new Map(sections.flatMap(s=>s.blocks).filter(b=>b.id).map(b=>[b.id!,b]));
 export const dailyIds=dailyGroups.flatMap(g=>[...g.ids]);
@@ -25,7 +25,7 @@ const questionLabels:Record<string,string>={
 };
 export function questionBlock(id:string):Block{
  const b=blockById.get(id)!;
- return {...b,label:questionLabels[id]||b.label,long:b.type==='text'&&['f3','f62','f110','f127','f135','f165','f171'].includes(id)?true:b.long};
+ return {...b,label:questionLabels[id]||b.label,placeholder:['f135','f165','f171'].includes(id)?'等待同日复盘自动摘录；原文缺失时留空，不自动编写。':b.placeholder,long:b.type==='text'&&['f3','f62','f110','f127','f135','f165','f171'].includes(id)?true:b.long};
 }
 export const answer=(p:Paper,id:string)=>{const v=p.answers[id];return Array.isArray(v)?v.join('、'):v||''};
 export const answered=(p:Paper,ids:readonly string[])=>ids.filter(id=>!!answer(p,id)).length;

@@ -9,6 +9,7 @@ import {useMarketContext} from './market-context';
 import {applyPromotionFill} from '../promotion-fill';
 import {applyThemeLimitUpFill} from '../theme-limitup-fill';
 import {applyLeaderCandidateFill,candidateRowProtected} from '../leader-candidates';
+import {applyExecutionReflectionFill} from '../execution-reflection';
 import {useRecapDigest} from '../use-recap-digest';
 
 export default function DailyQuestionnaire({paper,day,date,change,edit}:{paper:Paper;day?:Day;date:string;change:(k:string,v:string|string[])=>void;edit:(p:Paper)=>void}){
@@ -19,12 +20,13 @@ export default function DailyQuestionnaire({paper,day,date,change,edit}:{paper:P
  const limitUps=data?.limitUpDays?.[date];
  const {data:recap,state:recapState}=useRecapDigest(day);
  const pool=recap?.date===date?recap.leaderPool:undefined;
+ const execution=recap?.date===date?recap.execution:undefined;
  const protectedRows=[0,1,2,3].filter(row=>candidateRowProtected(paper,row)).map(row=>'ABCD'[row]);
- useEffect(()=>{const promoted=applyPromotionFill(paper,date,promotion).paper;const counted=applyThemeLimitUpFill(promoted,date,limitUps).paper;const next=applyLeaderCandidateFill(counted,date,day,pool).paper;if(next!==paper)edit(next);},[paper,date,day,promotion,limitUps,pool,edit]);
+ useEffect(()=>{const promoted=applyPromotionFill(paper,date,promotion).paper;const counted=applyThemeLimitUpFill(promoted,date,limitUps).paper;const candidates=applyLeaderCandidateFill(counted,date,day,pool).paper;const next=applyExecutionReflectionFill(candidates,date,day,execution).paper;if(next!==paper)edit(next);},[paper,date,day,promotion,limitUps,pool,execution,edit]);
  const review={cycle:'',body:'',next:'',sectors:[],...paper.review};
  function render(b:Block,j:number){const auto=b.id?paper.autoFill?.[b.id]:undefined;return <div key={b.id||j} className={b.long?'wide-field':''}>{b.id==='f11'&&<p className="auto-source">{promotion?`自动采集 · ${promotion.previousDate} → ${date}；5板以上指昨日≥5板继续晋级。判断栏为客观统计，不代填整体强弱判断。`:'系统自动采集：等待同日及上一交易日的完整涨停池，无需手写。'}{promotion&&<a href={promotion.sources[0]} target="_blank" rel="noreferrer">查看数据来源</a>}{paper.submitted&&' 已归档答卷保持原样。'}</p>}{b.id==='f66'&&<p className="auto-source">{pool?.available?`自动带入 · ${date} 每日复盘「龙头预备票」，共 ${pool.candidates.length} 只。`:(recapState||'等待同日复盘明确候选池，取得后自动填写，无需手抄。')}{pool&&pool.candidates.length>4&&<span>表格按原文顺序显示前4只；其余：{pool.candidates.slice(4).map(c=>c.name).join('、')}。完整名单见原文。</span>}<span>保留原文的条件观察、仅作锚点和不参与限制；不代填后续评分及最终判断。</span>{protectedRows.length>0&&<span>{protectedRows.join('、')} 行已有手动填写或比较评分，整行保留，避免错配候选。</span>}{paper.submitted&&<span>已归档答卷保持原样。</span>}{day?.url&&<a href={day.url} target="_blank" rel="noreferrer">查看同日复盘依据</a>}</p>}<BlockView b={b} answers={paper.answers} change={change}/>{auto&&<p className="auto-source"><Check size={13}/>{paper.answers[b.id!]===auto.value?(b.id==='f44'?(/^(待核|未单列)$/.test(auto.value)?'自动核对 · '+auto.value:'自动采集 · 涨停家数'):'已带入同日资料'):'保留你的手动修改'} · <a href={auto.sourceUrl} target="_blank" rel="noreferrer">查看来源</a><span>{auto.evidence}</span></p>}</div>}
  return <section id="exam" className="desk-exam compact-exam">
-  <div className="section-heading"><div><span className="section-kicker">第二步 / 我的判断</span><h2>决策考卷 · 只问关键问题</h2><p>已填 {answered(paper,dailyIds)} / {dailyIds.length} 题。同一个判断只写一次；补充核验不计入日常进度。</p></div><a className="exam-oral-link" href="#oral-review">语音 / 整段文字填写</a></div>
+  <div className="section-heading"><div><span className="section-kicker">第二步 / 我的判断</span><h2>决策考卷 · 只问关键问题</h2><p>已填 {answered(paper,dailyIds)} / {dailyIds.length} 项，其中执行与反思 3 项自动摘录；补充核验不计入进度。</p></div><a className="exam-oral-link" href="#oral-review">语音 / 整段文字填写</a></div>
   <div className="exam-facts">
    <div className="exam-facts-heading"><h3>系统资料</h3><span>自动带入，无需抄写</span></div>
    {factualGroups.map(g=><details className="exam-disclosure" key={g.title}><summary>{g.title}<span>查看 / 校正<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.ids.map((id,j)=>render(blockById.get(id)!,j))}</div></details>)}
@@ -42,6 +44,7 @@ export default function DailyQuestionnaire({paper,day,date,change,edit}:{paper:P
       {day?.url&&<a href={day.url} target="_blank" rel="noreferrer">打开同日完整复盘</a>}
      </aside>
      <div className="decision-fields">
+      {i===4&&<p className="auto-source wide-field">{paper.submitted?'已归档答案保持原样，不自动改写。':execution?(Object.keys(execution).length===3?'三项已从同日复盘提取。原有手写内容优先保留。':`同日原文可提取 ${Object.keys(execution).length} / 3 项；缺失部分保持原样，原文补齐后自动同步。`):(recapState||'等待同日复盘，系统读取后自动填写，无需手抄。')}</p>}
       {g.ids.map((id,j)=>render(questionBlock(id),j))}
       <details className="exam-disclosure exam-optional"><summary>按需补充核验<span>{hasBlockAnswers(paper,g.optional)?'已有补充答案':'选填'}<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.optional.map((id,j)=><div key={id}>{id==='f67'&&<h4>候选七维比较（对应系统候选池 A-D）</h4>}{id==='f104'&&<h4>天时、地利、人和核验</h4>}{id==='f112'&&<h4>交易盈亏比核验</h4>}{render(questionBlock(id),j)}</div>)}</div></details>
      </div>
