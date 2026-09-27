@@ -154,3 +154,42 @@ assert.equal(matchingLimitUps('通信',dx.groups).length,0,'Absent independent c
 assert.equal(context.limitUpDays['2026-09-25'],undefined,'Unpublished date stays empty');
 assert(Object.values(context.limitUpDays).every(d=>d.groups.every(g=>g.count===new Set(g.stocks.map(s=>s.code)).size)));
 console.log('PASS: Duanxianxia real-date counts, source-preserving group aliases, no false subgroup counts and complete stock reconciliation');
+
+const themeFillUrl=moduleUrl(fs.readFileSync('app/theme-limitup-fill.ts','utf8').replace("'./market-context'",JSON.stringify(contextUrl)));
+const {applyThemeLimitUpFill}=await import(themeFillUrl);
+const themePaper={...emptyPaper(),answers:{f40:'芯片',f41:'用户的逻辑',f43:'硬逻辑',f45:'强'}};
+const chip=applyThemeLimitUpFill(themePaper,dx.date,dx);
+assert(chip.changed&&validatePaper(chip.paper));
+assert.equal(chip.paper.answers.f44,'算力/半导体产业链：8 家（原始分类，未拆分或合计）');
+assert.equal(chip.paper.answers.f41,'用户的逻辑');assert.equal(chip.paper.answers.f43,'硬逻辑');assert.equal(chip.paper.answers.f45,'强');
+assert.equal(chip.paper.autoFill.f44.subject,'芯片');
+assert(!applyThemeLimitUpFill(chip.paper,dx.date,dx).changed);
+const pcb=applyThemeLimitUpFill({...chip.paper,answers:{...chip.paper.answers,f40:'PCB'}},dx.date,dx);
+assert.equal(pcb.paper.answers.f44,'5 家');
+assert.equal(applyThemeLimitUpFill({...pcb.paper,answers:{...pcb.paper.answers,f40:'通信'}},dx.date,dx).paper.answers.f44,'未单列');
+assert.equal(applyThemeLimitUpFill({...pcb.paper,answers:{...pcb.paper.answers,f40:''}},dx.date,dx).paper.answers.f44,'');
+const missingTheme=applyThemeLimitUpFill(themePaper,'2026-09-25',dx);
+assert.equal(missingTheme.paper.answers.f44,'待核');assert.equal(missingTheme.paper.autoFill.f44.sourceDate,'2026-09-25');
+assert.equal(applyThemeLimitUpFill(themePaper,dx.date).paper.answers.f44,'待核');
+assert.equal(applyThemeLimitUpFill(chip.paper,dx.date).paper,chip.paper,'Transient missing feed preserves verified same-date data');
+const changedMissing=applyThemeLimitUpFill({...chip.paper,answers:{...chip.paper.answers,f40:'医药'}},dx.date);
+assert.equal(changedMissing.paper.answers.f44,'待核','Theme change must clear the old automatic count');
+assert.equal(applyThemeLimitUpFill(changedMissing.paper,dx.date,dx).paper.answers.f44,'2 家');
+const refreshedDay={...dx,groups:dx.groups.map(g=>g.name==='PCB产业链'?{...g,count:6,stocks:[...g.stocks,{code:'000001',name:'fixture'}]}:g)};
+assert.equal(applyThemeLimitUpFill(pcb.paper,dx.date,refreshedDay).paper.answers.f44,'6 家');
+for(const value of ['9 家','']){
+ const manual={...chip.paper,answers:{...chip.paper.answers,f44:value}};
+ assert.equal(applyThemeLimitUpFill(manual,dx.date,dx).paper,manual);
+}
+assert(!applyThemeLimitUpFill({...themePaper,answers:{...themePaper.answers,f44:'旧版手填'}},dx.date,dx).changed);
+assert(!applyThemeLimitUpFill({...chip.paper,submitted:true},dx.date,refreshedDay).changed);
+const zeroDay={...dx,groups:[{name:'芯片',count:0,stocks:[]}]};
+assert.equal(applyThemeLimitUpFill(themePaper,dx.date,zeroDay).paper.answers.f44,'0 家');
+assert.equal(applyThemeLimitUpFill(themePaper,dx.date,{...zeroDay,groups:[{name:'芯片',count:9,stocks:[]}]}).paper.answers.f44,'待核');
+assert.equal(applyThemeLimitUpFill(themePaper,dx.date,{...dx,groups:[...dx.groups,{name:'芯片',count:0,stocks:[]}]}).paper.answers.f44,'0 家','Prefer exact classification over a broader group');
+assert(!validatePaper({...chip.paper,autoFill:{f41:chip.paper.autoFill.f44}}),'Feed provenance is objective-field only');
+assert(validatePaper(JSON.parse(JSON.stringify(chip.paper))));
+assert(markdown(dx.date,chip.paper).includes(chip.paper.answers.f44));
+const combined=applyThemeLimitUpFill(applyPromotionFill(themePaper,dx.date,promotion).paper,dx.date,dx).paper;
+assert(validatePaper(combined));assert.equal(combined.answers.f11_0_1,'1 / 2');assert.equal(combined.answers.f44,chip.paper.answers.f44);
+console.log('PASS: automatic theme counts, source scope, exact-date and theme isolation, source corrections, zero/missing, manual/archive protection, promotion coexistence and saved/exported values');

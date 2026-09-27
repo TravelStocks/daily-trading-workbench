@@ -5,7 +5,7 @@ export type Answers=Record<string,string|string[]>;
 export type SectorEntry={name:string;strength:string;state:string};
 export type Review={cycle:string;body:string;next:string;sectors:SectorEntry[]};
 export const sectorStates=['正常','小分歧','大分歧','分歧转一致','弱回流','强回流','高潮','退潮','尚未确认'];
-export type AutoEntry={value:string;sourceDate:string;sourceUrl:string;evidence:string};
+export type AutoEntry={value:string;sourceDate:string;sourceUrl:string;evidence:string;subject?:string};
 export type Paper={answers:Answers;done:number[];submitted:boolean;review?:Review;autoFill?:Record<string,AutoEntry>};
 export const emptyPaper=():Paper=>({answers:{},done:[],submitted:false});
 export const fields=new Map<string,{label:string;options?:string[];multi?:boolean}>();
@@ -20,7 +20,7 @@ for(const s of sections)for(const b of s.blocks){
 export function validatePaper(v:unknown):v is Paper{
  if(!v||typeof v!=='object')return false;
  const p=v as Paper;
- if(p.autoFill!==undefined){if(!p.autoFill||typeof p.autoFill!=='object'||Array.isArray(p.autoFill)||Object.keys(p.autoFill).length>30)return false;for(const [k,e] of Object.entries(p.autoFill)){if(!fields.has(k)||!e||!['value','sourceDate','sourceUrl','evidence'].every(key=>typeof e[key as keyof AutoEntry]==='string'&&e[key as keyof AutoEntry].length<=12000)||!validDate(e.sourceDate)||!(e.sourceUrl.startsWith('https://travelstocks.github.io/daily-trading-review/')||(/^f11_[0-3]_[12]$/.test(k)&&e.sourceUrl==='https://travelstocks.github.io/daily-trading-workbench/data/market-context.json')))return false}}
+ if(p.autoFill!==undefined){if(!p.autoFill||typeof p.autoFill!=='object'||Array.isArray(p.autoFill)||Object.keys(p.autoFill).length>30)return false;for(const [k,e] of Object.entries(p.autoFill)){if(!fields.has(k)||!e||!['value','sourceDate','sourceUrl','evidence'].every(key=>typeof e[key as keyof AutoEntry]==='string'&&e[key as 'value'].length<=12000)||(e.subject!==undefined&&(typeof e.subject!=='string'||e.subject.length>12000))||!validDate(e.sourceDate)||!(e.sourceUrl.startsWith('https://travelstocks.github.io/daily-trading-review/')||((/^f11_[0-3]_[12]$/.test(k)||k==='f44')&&e.sourceUrl==='https://travelstocks.github.io/daily-trading-workbench/data/market-context.json')))return false}}
  if(p.review!==undefined){const r=p.review;if(!r||typeof r!=='object'||!['cycle','body','next'].every(k=>typeof r[k as 'cycle']==='string'&&r[k as 'cycle'].length<=(k==='body'?60000:12000))||!Array.isArray(r.sectors)||r.sectors.length>80||!r.sectors.every(s=>s&&typeof s.name==='string'&&s.name.length<=100&&typeof s.strength==='string'&&(s.strength===''||(/^[+-]?\d+(\.\d+)?$/.test(s.strength)&&Number.isFinite(Number(s.strength))))&&typeof s.state==='string'&&(!s.state||sectorStates.includes(s.state))))return false;}
  if(!p.answers||typeof p.answers!=='object'||Array.isArray(p.answers)||!Array.isArray(p.done)||typeof p.submitted!=='boolean')return false;
  if(!p.done.every(i=>Number.isInteger(i)&&i>=0&&i<sections.length)||new Set(p.done).size!==p.done.length)return false;
