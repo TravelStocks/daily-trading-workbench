@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import {instruments,boards,parseKlines,parseNaver,parseBoard,completed} from './market-data.mjs';
 import {fetchLimitUps} from './duanxianxia.mjs';
 import {collectPromotions} from './promotions.mjs';
+import {collectPromotionFeedback} from './promotion-feedback.mjs';
 const path='public/data/market-context.json',now=new Date(),end=now.toISOString().slice(0,10).replaceAll('-','');
 const old=await fs.readFile(path,'utf8').then(JSON.parse).catch(()=>({quotes:[],themes:{}}));
 const result={version:1,updatedAt:now.toISOString(),quotes:[...old.quotes],themes:{...old.themes},limitUpDays:{...old.limitUpDays},marketRiskDays:{...old.marketRiskDays},errors:[]};
@@ -64,6 +65,7 @@ try{
  }
 }catch(e){result.errors.push(`market risk: ${e.message}`)}
 try{const promotion=await collectPromotions(old,now);Object.assign(result,{promotionPools:promotion.promotionPools,promotionDays:promotion.promotionDays});result.errors.push(...promotion.errors.map(e=>'promotion: '+e));}catch(e){Object.assign(result,{promotionPools:old.promotionPools||{},promotionDays:old.promotionDays||{}});result.errors.push('promotion: '+e.message);}
+try{const feedback=await collectPromotionFeedback({...result,promotionFeedbackDays:old.promotionFeedbackDays,promotionFeedbackQuotes:old.promotionFeedbackQuotes},now);Object.assign(result,{promotionFeedbackDays:feedback.promotionFeedbackDays,promotionFeedbackQuotes:feedback.promotionFeedbackQuotes});result.errors.push(...feedback.errors.map(e=>'promotion feedback: '+e));}catch(e){Object.assign(result,{promotionFeedbackDays:old.promotionFeedbackDays||{},promotionFeedbackQuotes:old.promotionFeedbackQuotes||{}});result.errors.push('promotion feedback: '+e.message);}
 if(!result.quotes.some(q=>q.updatedAt===now.toISOString())&&!Object.values(result.limitUpDays).some(d=>d.updatedAt===now.toISOString())&&!Object.keys(result.promotionDays||{}).length)throw Error('All sources failed; retain previously published data');
 result.quotes.sort((a,b)=>instruments.findIndex(q=>q[1]===a.id)-instruments.findIndex(q=>q[1]===b.id));
 await fs.mkdir('public/data',{recursive:true});await fs.writeFile(path,JSON.stringify(result));

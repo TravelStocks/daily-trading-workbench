@@ -5,6 +5,7 @@ import type {Day} from '../recap-source';
 import {useRecapDigest} from '../use-recap-digest';
 import './recap-digest.css';
 import {ThemeTotals} from './market-context';
+import PromotionFeedback from './promotion-feedback';
 const Missing=()=> <p className="digest-missing">同日资料暂未提供这一项，可展开原文核对。</p>;
 export default function RecapDigest({day}:{day?:Day}){
  const [allPlans,setAllPlans]=useState(false);
@@ -16,6 +17,7 @@ export default function RecapDigest({day}:{day?:Day}){
  return <div className="recap-digest"><p className="digest-context">{day?.date||'所选日'} · 同日复盘浓缩版。场景和预案沿用原文，供下一交易日核对。</p>{state&&<p role="status" className="digest-load-state">{state}{state.startsWith('暂时')&&<button className="digest-more" onClick={retryLoad}>重试整理</button>}</p>}
  <div className="digest-overview"><article className="digest-section"><h3><span>01</span>今日大盘</h3><p className="digest-headline">{data.headlines.market||'待当日复盘'}</p><div className="digest-indices">{metrics.slice(0,4).map(([k,v])=><div key={k}><span>{k}</span><strong>{v}</strong></div>)}</div><p className="digest-facts">量能 {get('沪指量能')}（原文口径） · 上涨/下跌 {get('腾落数（上涨-下跌）')}</p>{data.marketPoints.find(s=>/分化|主线竞争/.test(s))&&<p className="digest-note">{data.marketPoints.find(s=>/主线竞争/.test(s))||data.marketPoints.find(s=>/分化/.test(s))}</p>}</article>
  <article className="digest-section"><h3><span>02</span>今日情绪</h3><p className="digest-headline">{data.headlines.emotion||'待当日复盘'}</p><div className="digest-emotion-facts">{[['涨停/跌停',get('极端腾落数（涨停-跌停）')],['封板率',get('封板率')],['高度板',get('高度板')],['断板',get('断板')]].map(([k,v])=><div key={k}><span>{k}</span><strong>{v}</strong></div>)}</div><p className="digest-facts">首板 {get('一板')} · 二板 {get('二板')} · 三板 {get('三板')}</p>{data.emotionPoints.length>0&&<p className="digest-note">{data.emotionPoints.at(-1)}</p>}</article></div>
+ <PromotionFeedback date={day?.date||''}/>
  <article className="digest-section"><h3><span>03</span>题材梯队</h3>{data.themes.length?<div className="digest-themes">{data.themes.map(t=><div className="digest-theme" key={t.name}><div className="digest-theme-heading"><strong>{t.name}</strong><span>{t.role}</span></div><ThemeTotals name={t.name} date={day?.date||''}/><ul>{t.ladder.map(s=><li key={s.name}><b>{s.name}</b><span>{s.board}</span><small>{s.role}</small></li>)}</ul>{t.outlook&&<p>次日：{t.outlook}</p>}</div>)}</div>:<Missing/>}</article>
  <article className="digest-section"><h3><span>04</span>关注标的<small>保留原文分级与风险观察票</small></h3>{data.stocks.length?<div className="digest-stocks">{data.stocks.map(s=><div key={s.name}><strong>{s.name}<small>{s.level}</small></strong><span>{s.theme} · {s.role}</span></div>)}</div>:<Missing/>}</article>
  <article className="digest-section"><h3><span>05</span>四种场景<small>确认信号 → 动作 → 撤退条件</small></h3>{data.scenarios.length?<div className="digest-scenarios">{data.scenarios.map(s=><section key={s.name}><h4>{s.name}<span>{s.level}</span></h4><dl><div><dt>确认</dt><dd>{s.signal||'原文待补'}</dd></div><div><dt>动作</dt><dd>{s.action||'原文待补'}</dd></div><div><dt>撤退</dt><dd>{s.exit||'原文待补'}</dd></div></dl></section>)}</div>:<Missing/>}</article>

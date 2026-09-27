@@ -60,6 +60,13 @@ const corrected={...promoted.paper,answers:{...promoted.paper.answers,f11_0_1:'�
 assert.equal(applyPromotionFill(corrected,promotion.date,promotion).paper.answers.f11_0_1,'我的校正');assert.equal(applyPromotionFill(corrected,promotion.date,promotion).paper.answers.f11_1_2,'');
 assert.equal(applyPromotionFill({...emptyPaper(),submitted:true},promotion.date,promotion).changed,false);assert.equal(applyPromotionFill(emptyPaper(),'2026-09-24',promotion).changed,false);assert.equal(applyPromotionFill(emptyPaper(),promotion.date).changed,false);
 assert.equal(applyPromotionFill(emptyPaper(),promotion.date,{...promotion,rows:promotion.rows.map(r=>({...r,success:99}))}).changed,false);
+const feedbackFixture={date:promotion.date,previousDate:promotion.previousDate,groups:[{label:promotion.rows[0].label,total:2,success:1,failed:1,known:1,mean:-10,touched:1,meanDrop:18.18}]};
+const withFeedback=applyPromotionFill(promoted.paper,promotion.date,promotion,feedbackFixture);
+assert(withFeedback.paper.answers.f11_0_2.includes('失败股均值 -10.00%（1/1 已核）'));
+assert(withFeedback.paper.answers.f11_0_2.includes('18.18%'));
+assert.equal(applyPromotionFill(withFeedback.paper,promotion.date,promotion,feedbackFixture).changed,false);
+assert.equal(applyPromotionFill(promoted.paper,promotion.date,promotion,{...feedbackFixture,date:'1900-01-01'}).changed,false);
+assert.equal(applyPromotionFill({...withFeedback.paper,submitted:true},promotion.date,promotion,feedbackFixture).changed,false);
 console.log('PASS: automatic promotion cells, factual commentary, date isolation, no subjective answers, manual/archive protection');
 
 const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./required-reviews'",JSON.stringify(dailyRequiredUrl)).replace("'./theme-review'",JSON.stringify(themeReviewUrl)));
