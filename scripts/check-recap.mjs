@@ -57,11 +57,31 @@ assert.equal(applyPromotionFill(emptyPaper(),promotion.date,{...promotion,rows:p
 console.log('PASS: automatic promotion cells, factual commentary, date isolation, no subjective answers, manual/archive protection');
 
 const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
-const {dailyIds,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
-assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,22);
+const {dailyIds,optionalIds,factualGroups,questionBlock,legacyAnswerGroups,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
+assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,14);
 assert.equal(answered(emptyPaper(),dailyIds),0);assert.equal(answered({...emptyPaper(),answers:{f143:'复苏',f3:'摘要'}},dailyIds),2);
 const day=history.days.find(d=>d.date==='2026-09-22');assert.equal(recapBriefs(day).length,4);assert.equal(marketMetrics(day).find(([k])=>k==='高度板')[1],'6');assert.equal(recapBriefs(undefined).length,0);assert(marketMetrics(undefined).every(([,v])=>v==='—'));
-console.log('PASS: 22 original-field daily questions, shared progress, source-faithful briefs, missing-day metrics, complete source chapters in report');
+const presented=[...dailyIds,...optionalIds,...factualGroups.flatMap(g=>g.ids)];
+assert.equal(new Set(presented).size,presented.length,'No field may be asked in multiple compact groups');
+assert(presented.every(id=>blockById.has(id)));
+assert.equal(questionBlock('f38').options,blockById.get('f38').options,'Choice values and compatibility remain unchanged');
+assert.equal(questionBlock('f135').long,true);assert.equal(blockById.get('f135').label,'实际执行','Presentation must not mutate the persisted schema');
+const legacyPaper={...emptyPaper(),done:[1,8],answers:{f5:'退潮',f143:'主升',f175:'空仓',f38:'轻仓',f133:'旧交易清单',f135:'新操作结果',f164:'执行问题',f66_0_1:'测试候选',f78_0_1:'旧量能证据',f116:'10%',f110:'确认后参与',f127:'失效就退出'},review:{cycle:'',body:'旧反思',next:'旧补充预案',sectors:[]}};
+assert(validatePaper(legacyPaper));
+const beforeProjection=JSON.stringify(legacyPaper);
+const retainedLegacy=legacyAnswerGroups(legacyPaper).flatMap(g=>g.blocks.map(b=>b.id));
+assert.deepEqual(new Set(retainedLegacy),new Set(['f5','f175','f133','f164','f78_0_1']));
+assert.equal(JSON.stringify(legacyPaper),beforeProjection,'Compact view never migrates, rewrites, or deletes original answers');
+assert.deepEqual(legacyAnswerGroups(emptyPaper()),[]);
+const compactReport=buildReport('2026-09-22',legacyPaper,history);
+assert(compactReport.sections[0].summary.includes('主模式：轻仓'),'Canonical answer wins over stale duplicate conclusion');
+assert(compactReport.sections[9].summary.includes('参与条件：确认后参与'));
+assert(compactReport.sections[9].facts.some(([k,v])=>k==='已有补充预案'&&v==='旧补充预案'));
+const planOnly=buildReport('2026-09-22',{...legacyPaper,review:undefined},history);
+assert(!planOnly.pending.some(s=>s.includes('个人明日预案')),'Four plan fields replace the redundant narrative question');
+assert(buildReport('2026-09-22',{...emptyPaper(),answers:{f38:'轻仓'}},history).pending.some(s=>s.includes('个人明日预案')),'Incomplete plans remain marked');
+assert(reportMarkdown(compactReport).includes('旧交易清单')&&markdown('2026-09-22',legacyPaper).includes('旧量能证据'),'Both exports retain removed duplicate fields');
+console.log('PASS: 14 deduplicated daily questions, non-overlapping optional/factual groups, immutable legacy answers, canonical summary and single-entry plan');
 
 assert.equal(cycleWindow(history.days,'2026-09-23','20').at(-1).date,'2026-09-22','Missing recent day keeps recent cycle context');
 assert(cycleWindow(history.days,'2026-06-01','20').some(d=>d.date==='2026-06-01'));

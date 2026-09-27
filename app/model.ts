@@ -8,6 +8,11 @@ export const sectorStates=['正常','小分歧','大分歧','分歧转一致','�
 export type AutoEntry={value:string;sourceDate:string;sourceUrl:string;evidence:string;subject?:string};
 export type Paper={answers:Answers;done:number[];submitted:boolean;review?:Review;autoFill?:Record<string,AutoEntry>};
 export const emptyPaper=():Paper=>({answers:{},done:[],submitted:false});
+export function personalPlan(p:Paper){
+ const items=[['f38','参与模式'],['f116','仓位上限'],['f110','参与条件'],['f127','退出条件']];
+ const parts=items.flatMap(([id,label])=>{const value=p.answers[id];return typeof value==='string'&&value.trim()?[label+'：'+value]:[]});
+ return parts.length?parts.join('；')+'。':'';
+}
 export const fields=new Map<string,{label:string;options?:string[];multi?:boolean}>();
 for(const s of sections)for(const b of s.blocks){
  if(b.type==='text'||b.type==='choice')fields.set(b.id!,{label:b.label!,options:b.options,multi:b.multi});
