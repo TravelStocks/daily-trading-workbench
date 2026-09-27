@@ -33,6 +33,18 @@ assert.throws(()=>importRecords([{date:'2026-09-23',paper:old},{date:'2026-09-24
 assert.throws(()=>saveRecord('2026-09-31',old,0));
 console.log('PASS: objective-only fill, provenance, manual and cleared answers preserved, archived/date isolation, durable storage, revision conflict, import migration and atomic validation');
 
+const promotionUrl=moduleUrl(fs.readFileSync('app/promotion-fill.ts','utf8'));
+const {applyPromotionFill}=await import(promotionUrl);
+const promotion={date:'2026-09-23',previousDate:'2026-09-22',scope:'test scope',sources:['https://www.duanxianxia.com/web/fupan'],updatedAt:'2026-09-23T10:00:00Z',rows:['2进3','3进4','4进5','5板以上'].map((label,i)=>({label,success:i===0?1:0,total:i===0?2:0,rate:i===0?0.5:null,promoted:[],failed:[]}))};
+const promoted=applyPromotionFill(emptyPaper(),promotion.date,promotion);
+assert(promoted.changed);assert(validatePaper(promoted.paper));assert.equal(promoted.paper.answers.f11_0_1,'1 / 2');assert.equal(promoted.paper.answers.f11_1_2,'无参赛样本，不计算晋级率');assert.equal(promoted.paper.answers.f12,undefined);
+assert.equal(applyPromotionFill(promoted.paper,promotion.date,promotion).changed,false);
+const corrected={...promoted.paper,answers:{...promoted.paper.answers,f11_0_1:'我的校正',f11_1_2:''}};
+assert.equal(applyPromotionFill(corrected,promotion.date,promotion).paper.answers.f11_0_1,'我的校正');assert.equal(applyPromotionFill(corrected,promotion.date,promotion).paper.answers.f11_1_2,'');
+assert.equal(applyPromotionFill({...emptyPaper(),submitted:true},promotion.date,promotion).changed,false);assert.equal(applyPromotionFill(emptyPaper(),'2026-09-24',promotion).changed,false);assert.equal(applyPromotionFill(emptyPaper(),promotion.date).changed,false);
+assert.equal(applyPromotionFill(emptyPaper(),promotion.date,{...promotion,rows:promotion.rows.map(r=>({...r,success:99}))}).changed,false);
+console.log('PASS: automatic promotion cells, factual commentary, date isolation, no subjective answers, manual/archive protection');
+
 const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
 const {dailyIds,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
 assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,22);
