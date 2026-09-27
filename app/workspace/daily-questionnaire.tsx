@@ -2,7 +2,7 @@ import {useEffect,useMemo} from 'react';
 import {Check,ChevronDown,FileText} from 'lucide-react';
 import {type Paper,type Block} from '../model';
 import {BlockView} from '../block-view';
-import {dailyGroups,dailyIds,blockById,answered,hasBlockAnswers,questionBlock,factualGroups,legacyAnswerGroups} from '../desk-model';
+import {dailyGroups,progressIds,completedProgress,blockById,answered,hasBlockAnswers,questionBlock,factualGroups,legacyAnswerGroups} from '../desk-model';
 import {marketLeaders} from '../market-leaders';
 import type {Day} from '../recap-source';
 import {useMarketContext} from './market-context';
@@ -12,11 +12,12 @@ import {applyLeaderCandidateFill,candidateRowProtected} from '../leader-candidat
 import {applyExecutionReflectionFill} from '../execution-reflection';
 import {useRecapDigest} from '../use-recap-digest';
 import RequiredCandidateReview from './required-candidate-review';
-import {requiredDailyReviews,requiredMarketFields,requiredMarketReview} from '../required-reviews';
+import RequiredThemeReview from './required-theme-review';
+import {requiredDailyReviews,manualChecks} from '../required-reviews';
 
 export default function DailyQuestionnaire({paper,day,date,change,edit,requiredAttempted=false}:{paper:Paper;day?:Day;date:string;change:(k:string,v:string|string[])=>void;edit:(p:Paper)=>void;requiredAttempted?:boolean}){
  const legacy=legacyAnswerGroups(paper);
- const marketReview=requiredMarketReview(paper),requiredGroups=requiredDailyReviews(paper);
+ const requiredGroups=requiredDailyReviews(paper),displayIds=progressIds(paper),requiredIds=new Set(requiredGroups.flatMap(g=>g.fields.map(f=>f.id))),missingIds=new Set(requiredGroups.flatMap(g=>g.missing.map(f=>f.id)));
  const leaders=useMemo(()=>marketLeaders(day),[day]);
  const {data}=useMarketContext();
  const promotion=data?.promotionDays?.[date];
@@ -27,17 +28,18 @@ export default function DailyQuestionnaire({paper,day,date,change,edit,requiredA
  const protectedRows=[0,1,2,3].filter(row=>candidateRowProtected(paper,row)).map(row=>'ABCD'[row]);
  useEffect(()=>{const promoted=applyPromotionFill(paper,date,promotion).paper;const counted=applyThemeLimitUpFill(promoted,date,limitUps).paper;const candidates=applyLeaderCandidateFill(counted,date,day,pool).paper;const next=applyExecutionReflectionFill(candidates,date,day,execution).paper;if(next!==paper)edit(next);},[paper,date,day,promotion,limitUps,pool,execution,edit]);
  const review={cycle:'',body:'',next:'',sectors:[],...paper.review};
- function render(b:Block,j:number){const auto=b.id?paper.autoFill?.[b.id]:undefined;return <div key={b.id||j} className={b.long?'wide-field':''}>{b.id==='f11'&&<p className="auto-source">{promotion?`自动采集 · ${promotion.previousDate} → ${date}；5板以上指昨日≥5板继续晋级。判断栏为客观统计，不代填整体强弱判断。`:'系统自动采集：等待同日及上一交易日的完整涨停池，无需手写。'}{promotion&&<a href={promotion.sources[0]} target="_blank" rel="noreferrer">查看数据来源</a>}{paper.submitted&&' 已归档答卷保持原样。'}</p>}{b.id==='f66'&&<p className="auto-source">{pool?.available?`自动带入 · ${date} 每日复盘「龙头预备票」，共 ${pool.candidates.length} 只。`:(recapState||'等待同日复盘明确候选池，取得后自动填写，无需手抄。')}{pool&&pool.candidates.length>4&&<span>表格按原文顺序显示前4只；其余：{pool.candidates.slice(4).map(c=>c.name).join('、')}。完整名单见原文。</span>}<span>保留原文的条件观察、仅作锚点和不参与限制；不代填后续评分及最终判断。</span>{protectedRows.length>0&&<span>{protectedRows.join('、')} 行已有手动填写或比较评分，整行保留，避免错配候选。</span>}{paper.submitted&&<span>已归档答卷保持原样。</span>}{day?.url&&<a href={day.url} target="_blank" rel="noreferrer">查看同日复盘依据</a>}</p>}<BlockView b={b} answers={paper.answers} change={change} required={requiredMarketFields.some(f=>f.id===b.id)} invalid={requiredAttempted&&marketReview.missing.some(f=>f.id===b.id)}/>{auto&&<p className="auto-source"><Check size={13}/>{paper.answers[b.id!]===auto.value?(b.id==='f44'?(/^(待核|未单列)$/.test(auto.value)?'自动核对 · '+auto.value:'自动采集 · 涨停家数'):'已带入同日资料'):'保留你的手动修改'} · <a href={auto.sourceUrl} target="_blank" rel="noreferrer">查看来源</a><span>{auto.evidence}</span></p>}</div>}
+ function render(b:Block,j:number){const auto=b.id?paper.autoFill?.[b.id]:undefined;return <div key={b.id||j} className={b.long?'wide-field':''}>{b.id==='f11'&&<p className="auto-source">{promotion?`自动采集 · ${promotion.previousDate} → ${date}；5板以上指昨日≥5板继续晋级。判断栏为客观统计，不代填整体强弱判断。`:'系统自动采集：等待同日及上一交易日的完整涨停池，无需手写。'}{promotion&&<a href={promotion.sources[0]} target="_blank" rel="noreferrer">查看数据来源</a>}{paper.submitted&&' 已归档答卷保持原样。'}</p>}{b.id==='f66'&&<p className="auto-source">{pool?.available?`自动带入 · ${date} 每日复盘「龙头预备票」，共 ${pool.candidates.length} 只。`:(recapState||'等待同日复盘明确候选池，取得后自动填写，无需手抄。')}{pool&&pool.candidates.length>4&&<span>表格按原文顺序显示前4只；其余：{pool.candidates.slice(4).map(c=>c.name).join('、')}。完整名单见原文。</span>}<span>保留原文的条件观察、仅作锚点和不参与限制；不代填后续评分及最终判断。</span>{protectedRows.length>0&&<span>{protectedRows.join('、')} 行已有手动填写或比较评分，整行保留，避免错配候选。</span>}{paper.submitted&&<span>已归档答卷保持原样。</span>}{day?.url&&<a href={day.url} target="_blank" rel="noreferrer">查看同日复盘依据</a>}</p>}<BlockView b={b} answers={paper.answers} change={change} required={requiredIds.has(b.id||'')} invalid={requiredAttempted&&missingIds.has(b.id||'')}/>{auto&&<p className="auto-source"><Check size={13}/>{paper.answers[b.id!]===auto.value?(b.id==='f44'?(/^(待核|未单列)$/.test(auto.value)?'自动核对 · '+auto.value:'自动采集 · 涨停家数'):'已带入同日资料'):'保留你的手动修改'} · <a href={auto.sourceUrl} target="_blank" rel="noreferrer">查看来源</a><span>{auto.evidence}</span></p>}</div>}
  return <section id="exam" className="desk-exam compact-exam">
-  <div className="section-heading"><div><span className="section-kicker">第二步 / 我的判断</span><h2>决策考卷 · 只问关键问题</h2><p>日常问题 {answered(paper,dailyIds)} / {dailyIds.length} 项，含 3 项自动摘录；每日必填模块 {requiredGroups.filter(g=>g.complete).length} / {requiredGroups.length}。市场解析、逐票预期与龙头核验完成后才能交卷归档。</p></div><a className="exam-oral-link" href="#oral-review">语音 / 整段文字填写</a></div>
+  <div className="section-heading"><div><span className="section-kicker">第二步 / 我的判断</span><h2>决策考卷 · 只问关键问题</h2><p>日常问题 {completedProgress(paper)} / {displayIds.length} 项，含 3 项自动摘录；每日必填模块 {requiredGroups.filter(g=>g.complete).length} / {requiredGroups.length}。天时、地利、人和、交易逐项手填；四部分完成后才能交卷归档。</p></div><a className="exam-oral-link" href="#oral-review">语音 / 整段文字填写</a></div>
+  <nav className="manual-section-nav" aria-label="四部分必填进度">{requiredGroups.map((group,i)=><a href={'#decision-'+i} key={group.id}><strong>{['天时','地利','人和','交易'][i]}</strong><small>{group.filled} / {group.total}</small></a>)}</nav>
   <div className="exam-facts">
    <div className="exam-facts-heading"><h3>系统资料</h3><span>自动带入，无需抄写</span></div>
-   {factualGroups.map(g=><details className="exam-disclosure" id={g.ids.some(id=>id==='f66')?'candidate-pool':undefined} key={g.title}><summary>{g.title}<span>查看 / 校正<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.ids.map((id,j)=>render(blockById.get(id)!,j))}</div></details>)}
+   {factualGroups.map(g=><details className="exam-disclosure" id={g.ids.some(id=>id==='f66')?'candidate-pool':g.ids.some(id=>id==='f40')?'theme-pool':undefined} key={g.title}><summary>{g.title}<span>查看 / 校正<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.ids.map((id,j)=>render(blockById.get(id)!,j))}</div></details>)}
   </div>
   {dailyGroups.map((g,i)=>{
    const source=day?.sections?.find(s=>g.source.test(s.title));
    return <article className="decision-module" key={g.title} id={'decision-'+i}>
-    <header><span className="module-index">0{i+1}</span><div><h3>{g.title}</h3><p>{g.subtitle}</p></div><span className="module-progress">{answered(paper,g.ids)} / {g.ids.length}</span></header>
+    <header><span className="module-index">0{i+1}</span><div><h3>{g.title}</h3><p>{g.subtitle}</p></div><span className="module-progress">{i<4?requiredGroups[i].filled:answered(paper,g.ids)} / {i<4?requiredGroups[i].total:g.ids.length}</span></header>
     <div className="decision-body">
      <aside className="evidence-rail"><span className="evidence-label"><FileText size={14}/>复盘参考</span>
       {i===0&&<div className="evidence-height"><small>当前最高板</small><strong>{paper.answers.f6||day?.metrics?.['高度板']||'待补充'}</strong><p>{leaders.names.join(' / ')||'对应个股待核实'}</p></div>}
@@ -47,16 +49,18 @@ export default function DailyQuestionnaire({paper,day,date,change,edit,requiredA
       {day?.url&&<a href={day.url} target="_blank" rel="noreferrer">打开同日完整复盘</a>}
      </aside>
      <div className="decision-fields">
-      {i===0&&<p className="auto-source wide-field"><strong>每日必填 · 报告第二章 · {marketReview.filled} / {marketReview.total}</strong><span>下方三个标注“每日必填”的判断直接进入市场解析；最高板数据和参考原文不能替代填写。</span></p>}
+      {i<4&&<p className="auto-source wide-field"><strong>每日必填 · 请逐项手动判断</strong><span>未完成可存草稿；选择题须主动选择。原始数据继续自动采集，不会替你决定结论。</span></p>}
       {i===4&&<p className="auto-source wide-field">{paper.submitted?'已归档答案保持原样，不自动改写。':execution?(Object.keys(execution).length===3?'三项已从同日复盘提取。原有手写内容优先保留。':`同日原文可提取 ${Object.keys(execution).length} / 3 项；缺失部分保持原样，原文补齐后自动同步。`):(recapState||'等待同日复盘，系统读取后自动填写，无需手抄。')}</p>}
-      {g.ids.map((id,j)=>render(questionBlock(id),j))}
+      {i<4?manualChecks(paper,i).map((check,n)=><section className="manual-check-section" key={check.title}><h4><span>{String(n+1).padStart(2,'0')}</span>{check.title}</h4><div>{check.ids.map((id,j)=>render(questionBlock(id),j))}</div></section>):g.ids.map((id,j)=>render(questionBlock(id),j))}
+      {i===1&&<RequiredThemeReview paper={paper} change={change} attempted={requiredAttempted}/>}
+      {i===2&&<RequiredCandidateReview paper={paper} change={change} attempted={requiredAttempted} kind="leaders"/>}
+      {i===3&&<><p className="auto-source wide-field">{paper.answers.f38==='空仓'?'已选择空仓：无需编造买入价、盈亏比和买卖点时机；仍须写仓位上限、风险处理及重新评估条件。原有交易字段保留，切回参与模式后继续显示。':'请按实际参与计划填写买卖点与盈亏比；不替你推断价格、仓位或风险阈值。'}</p><RequiredCandidateReview paper={paper} change={change} attempted={requiredAttempted} kind="next"/></>}
       {g.optional.length>0&&<details className="exam-disclosure exam-optional"><summary>按需补充核验<span>{hasBlockAnswers(paper,g.optional)?'已有补充答案':'选填'}<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.optional.map((id,j)=><div key={id}>{id==='f104'&&<h4>天时、地利、人和核验</h4>}{id==='f112'&&<h4>交易盈亏比核验</h4>}{render(questionBlock(id),j)}</div>)}</div></details>}
      </div>
     </div>
    </article>;
   })}
-  <RequiredCandidateReview paper={paper} change={change} attempted={requiredAttempted}/>
-  <div className="exam-finish-note"><strong>市场解析、逐票预期与龙头核验每日必填，不再重写“终极六问 / 最终结论”。</strong><p>填写内容直接进入报告第二、十二、十三章；未完成可自动保存草稿，但不能交卷归档。不确定的必填项需说明原因与核验条件，不会替你编造结论。</p></div>
+  <div className="exam-finish-note"><strong>天时、地利、人和、交易四部分每日必填，不再重写“终极六问 / 最终结论”。</strong><p>填写内容直接进入市场解析、主线板块、交易计划与龙头核验等对应章节；未完成可自动保存草稿，但不能交卷归档。不确定的必填项需说明原因与核验条件，不会替你编造结论。</p></div>
   {(legacy.length>0||review.next)&&<details className="exam-disclosure exam-legacy"><summary>旧版已填答案与补充预案<span>已保留，无需重填<ChevronDown size={16}/></span></summary><div className="exam-detail-body"><p className="auto-source">这里只显示旧版已填内容，仍可修改和导出。精简不会自动合并、改写或删除你的原答案。</p>{legacy.map(g=><details className="exam-disclosure" key={g.title}><summary>{g.title}<span>{g.blocks.length} 项<ChevronDown size={16}/></span></summary><div className="exam-detail-body">{g.blocks.map(render)}</div></details>)}{review.next&&<label className="field">已有补充预案<textarea value={review.next} maxLength={12000} onChange={e=>edit({...paper,review:{...review,next:e.target.value}})}/></label>}</div></details>}
  </section>;
 }

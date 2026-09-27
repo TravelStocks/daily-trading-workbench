@@ -6,9 +6,11 @@ const modelUrl=moduleUrl(fs.readFileSync('app/model.ts','utf8').replace("import 
 const sourceUrl=moduleUrl(fs.readFileSync('app/recap-source.ts','utf8'));
 const requiredUrl=moduleUrl(fs.readFileSync('app/required-candidates.ts','utf8'));
 const {requiredCandidateReview,nextDayFields,leaderFields,reviewValueComplete,candidateRows}=await import(requiredUrl);
-const dailyRequiredUrl=moduleUrl(fs.readFileSync('app/required-reviews.ts','utf8').replace("'./required-candidates'",JSON.stringify(requiredUrl)));
-const {requiredMarketFields,requiredMarketReview,requiredDailyReviews}=await import(dailyRequiredUrl);
-const reportUrl=moduleUrl(fs.readFileSync('app/report-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./required-reviews'",JSON.stringify(dailyRequiredUrl)));
+const themeReviewUrl=moduleUrl(fs.readFileSync('app/theme-review.ts','utf8').replace("'./required-candidates'",JSON.stringify(requiredUrl)));
+const {activeThemeRows,themeFields,themeSlots}=await import(themeReviewUrl);
+const dailyRequiredUrl=moduleUrl(fs.readFileSync('app/required-reviews.ts','utf8').replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./model'",JSON.stringify(modelUrl)).replace("'./theme-review'",JSON.stringify(themeReviewUrl)));
+const {requiredMarketFields,requiredMarketReview,requiredDailyReviews,manualChecks,requiredValueComplete}=await import(dailyRequiredUrl);
+const reportUrl=moduleUrl(fs.readFileSync('app/report-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./required-reviews'",JSON.stringify(dailyRequiredUrl)).replace("'./theme-review'",JSON.stringify(themeReviewUrl)));
 const {topFive,aroundDates,recapPoints,recapSections}=await import(sourceUrl);
 const {buildReport,reportMarkdown}=await import(reportUrl);
 const {emptyPaper,validatePaper,fields,markdown}=await import(modelUrl);
@@ -35,7 +37,7 @@ const p=emptyPaper();p.answers={f143:'主升',f3:'QA市场判断',f135:'QA执行
 const empty=buildReport('1900-01-01',emptyPaper(),history);assert.equal(empty.sections.filter(s=>s.missing).length,13);assert(!empty.sourceUrl);assert(!reportMarkdown(empty).includes('8048'));
 console.log('PASS: date-driven top five, changed rankings, no look-ahead, zero/missing values, before/after window, source parser, 13-module report, shared answers, no cross-date source leakage');
 
-const autoUrl=moduleUrl(fs.readFileSync('app/autofill.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)));
+const autoUrl=moduleUrl(fs.readFileSync('app/autofill.ts','utf8').replace("'./recap-source'",JSON.stringify(sourceUrl)).replace("'./theme-review'",JSON.stringify(themeReviewUrl)));
 const storageUrl=moduleUrl(fs.readFileSync('app/local-records.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)));
 const {applyObjectiveFill}=await import(autoUrl);
 const {readRecords,saveRecord,importRecords}=await import(storageUrl);
@@ -60,14 +62,14 @@ assert.equal(applyPromotionFill({...emptyPaper(),submitted:true},promotion.date,
 assert.equal(applyPromotionFill(emptyPaper(),promotion.date,{...promotion,rows:promotion.rows.map(r=>({...r,success:99}))}).changed,false);
 console.log('PASS: automatic promotion cells, factual commentary, date isolation, no subjective answers, manual/archive protection');
 
-const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./required-reviews'",JSON.stringify(dailyRequiredUrl)));
-const {dailyIds,optionalIds,factualGroups,questionBlock,legacyAnswerGroups,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths}=await import(deskUrl);
-assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>blockById.has(id)));assert.equal(dailyIds.length,16);
+const deskUrl=moduleUrl(fs.readFileSync('app/desk-model.ts','utf8').replace("'./model'",JSON.stringify(modelUrl)).replace("'./required-candidates'",JSON.stringify(requiredUrl)).replace("'./required-reviews'",JSON.stringify(dailyRequiredUrl)).replace("'./theme-review'",JSON.stringify(themeReviewUrl)));
+const {dailyIds,optionalIds,factualGroups,questionBlock,legacyAnswerGroups,blockById,answered,recapBriefs,marketMetrics,cycleWindow,recapMonths,progressIds,completedProgress}=await import(deskUrl);
+assert.equal(new Set(dailyIds).size,dailyIds.length);assert(dailyIds.every(id=>fields.has(id)));assert.equal(dailyIds.length,57);
 assert.equal(answered(emptyPaper(),dailyIds),0);assert.equal(answered({...emptyPaper(),answers:{f143:'复苏',f3:'摘要'}},dailyIds),2);
 const day=history.days.find(d=>d.date==='2026-09-22');assert.equal(recapBriefs(day).length,4);assert.equal(marketMetrics(day).find(([k])=>k==='高度板')[1],'6');assert.equal(recapBriefs(undefined).length,0);assert(marketMetrics(undefined).every(([,v])=>v==='—'));
 const presented=[...dailyIds,...optionalIds,...factualGroups.flatMap(g=>g.ids)];
 assert.equal(new Set(presented).size,presented.length,'No field may be asked in multiple compact groups');
-assert(presented.every(id=>blockById.has(id)));
+assert(presented.every(id=>fields.has(id)||blockById.has(id)));
 assert.equal(questionBlock('f38').options,blockById.get('f38').options,'Choice values and compatibility remain unchanged');
 assert.equal(questionBlock('f135').long,true);assert.equal(blockById.get('f135').label,'实际执行','Presentation must not mutate the persisted schema');
 const legacyPaper={...emptyPaper(),done:[1,8],answers:{f5:'退潮',f143:'主升',f175:'空仓',f38:'轻仓',f133:'旧交易清单',f135:'新操作结果',f164:'执行问题',f66_0_1:'测试候选',f78_0_1:'旧量能证据',f116:'10%',f110:'确认后参与',f127:'失效就退出'},review:{cycle:'',body:'旧反思',next:'旧补充预案',sectors:[]}};
@@ -85,7 +87,7 @@ const planOnly=buildReport('2026-09-22',{...legacyPaper,review:undefined},histor
 assert(!planOnly.pending.some(s=>s.includes('个人明日预案')),'Four plan fields replace the redundant narrative question');
 assert(buildReport('2026-09-22',{...emptyPaper(),answers:{f38:'轻仓'}},history).pending.some(s=>s.includes('个人明日预案')),'Incomplete plans remain marked');
 assert(reportMarkdown(compactReport).includes('旧交易清单')&&markdown('2026-09-22',legacyPaper).includes('旧量能证据'),'Both exports retain removed duplicate fields');
-console.log('PASS: 16 deduplicated daily questions, non-overlapping optional/factual groups, immutable legacy answers, canonical summary and single-entry plan');
+console.log('PASS: four decomposed manual groups, non-overlapping fields, immutable legacy answers, canonical summary and single-entry plan');
 
 assert.equal(cycleWindow(history.days,'2026-09-23','20').at(-1).date,'2026-09-22','Missing recent day keeps recent cycle context');
 assert(cycleWindow(history.days,'2026-06-01','20').some(d=>d.date==='2026-06-01'));
@@ -352,27 +354,73 @@ console.log('PASS: two daily required modules, every field gated, all report col
 
 assert.deepEqual(requiredMarketFields.map(f=>f.id),['f3','f36','f37']);
 for(const f of requiredMarketFields){assert(dailyIds.includes(f.id));assert(!optionalIds.includes(f.id));assert(questionBlock(f.id).long);}
-assert.equal(requiredDailyReviews(emptyPaper()).length,3);
+assert.equal(requiredDailyReviews(emptyPaper()).length,4);
 const objectiveOnly={...emptyPaper(),answers:{f6:'5板'}};
 assert.equal(requiredMarketReview(objectiveOnly).missing.length,3,'Highest-board fact alone cannot satisfy market analysis');
 const sourceOnly=buildReport('2026-09-22',objectiveOnly,history);
 assert(sourceOnly.sections[1].source);
-assert(sourceOnly.pending.some(s=>s.includes('市场风格与赚钱效应解析（每日必填）')),'Source text is not the personal answer');
+assert(sourceOnly.pending.some(s=>s.includes('天时 · 市场环境（每日必填）')),'Source text is not the personal answer');
 assert(requiredDailyReviews(noCandidates).some(g=>!g.complete),'No-candidate explanation does not bypass required market analysis');
 const marketAnswers={f3:'市场风格：轮动而非主升；量能与梯队尚未同步改善',f36:'赚钱效应：仅局部前排有溢价，后排缺少跟随',f37:'亏钱效应：高位失败票承接弱，不追修复'};
 const marketComplete={...noCandidates,answers:{...noCandidates.answers,...marketAnswers}};
-assert(requiredDailyReviews(marketComplete).every(g=>g.complete));
+assert(requiredMarketReview(marketComplete).complete);
 for(const field of requiredMarketFields){
  for(const blank of ['','  ','待补充','无','—'])assert(!requiredMarketReview({...marketComplete,answers:{...marketComplete.answers,[field.id]:blank}}).complete);
 }
 assert(requiredMarketReview({...marketComplete,answers:{...marketComplete.answers,f36:'暂无明确赚钱效应：前排没有带动，待观察次日溢价'}}).complete);
 const marketReport=buildReport('2026-09-24',marketComplete,history);
 for(const text of Object.values(marketAnswers))assert(marketReport.sections[1].summary.includes(text));
-assert(!marketReport.pending.some(s=>s.includes('每日必填')));
+assert(marketReport.pending.some(s=>s.includes('地利 · 主线板块（每日必填）')),'A market summary alone does not satisfy the four-part checklist');
 assert(validatePaper(JSON.parse(JSON.stringify(marketComplete))));
 assert.equal(legacyAnswerGroups(marketComplete).length,0,'Existing f36/f37 reuse the required inputs, not legacy duplicates');
 assert(markdown('2026-09-24',marketComplete).includes(marketAnswers.f36));
 assert(reportMarkdown(marketReport).includes(marketAnswers.f37));
 const priorArchive={...objectiveOnly,submitted:true};assert(validatePaper(priorArchive));
 const archiveBefore=JSON.stringify(priorArchive);requiredDailyReviews(priorArchive);assert.equal(JSON.stringify(priorArchive),archiveBefore);
-console.log('PASS: market style/reward/punishment required, objective/source-only gaps detected, three-module gate, old field reuse, no-candidate independence and report/export compatibility');
+console.log('PASS: market style/reward/punishment required, objective/source-only gaps detected, old field reuse, no-candidate independence and report/export compatibility');
+
+function completeManual(paper){
+ const result=structuredClone(paper);
+ for(const group of requiredDailyReviews(result))for(const field of group.fields){
+  if(requiredValueComplete(result,field.id))continue;
+  const meta=fields.get(field.id);assert(meta,'Persisted field missing: '+field.id);
+  result.answers[field.id]=meta.options?(meta.multi?[meta.options[0]]:meta.options[0]):'QA手填 '+field.id+'：已检查依据及验证条件';
+ }
+ return result;
+}
+const fourPart=completeManual({...requiredPaper,answers:{...requiredPaper.answers,f40:'QA题材A',f50:'QA题材B',f55:'QA题材C'}});
+const fourGroups=requiredDailyReviews(fourPart);
+assert.deepEqual(fourGroups.map(g=>g.title),['天时 · 市场环境','地利 · 主线板块','人和 · 龙头竞争','交易 · 执行与风控']);
+assert(fourGroups.every(g=>g.complete));
+const fourIds=fourGroups.flatMap(g=>g.fields.map(f=>f.id));assert.equal(new Set(fourIds).size,fourIds.length,'No repeated manual question across the four parts');
+assert(!fourIds.some(id=>/^f11_|^f66_|^f6$|^f44$/.test(id)),'Objective facts are not forced manual homework');
+assert.equal(completedProgress(fourPart),fourIds.length);assert.equal(progressIds(fourPart).length,fourIds.length+3);
+assert(validatePaper(JSON.parse(JSON.stringify(fourPart))));
+for(const id of fourIds){const missing={...fourPart,answers:{...fourPart.answers,[id]:''}};assert(requiredDailyReviews(missing).some(g=>!g.complete),'Must block archive when missing: '+id);}
+const fourReport=buildReport('2026-09-24',fourPart,history);
+for(const row of [0,1,2])for(const f of themeFields(row))assert(fourReport.sections[5].facts.some(([,v])=>v===fourPart.answers[f.id]),'Theme answer belongs in chapter 6: '+f.id);
+assert(fourReport.sections[9].facts.some(([,v])=>v===fourPart.answers.f191));
+assert(fourReport.sections[9].facts.some(([,v])=>v===fourPart.answers.f192));
+assert(fourReport.sections[10].facts.some(([,v])=>v===fourPart.answers.f112_3_1));
+assert(!fourReport.pending.some(s=>s.includes('每日必填')));
+assert(!requiredDailyReviews({...fourPart,answers:{...fourPart.answers,f60:'无',f62:'无'}})[1].complete,'No mainline still needs reasons');
+assert(requiredDailyReviews({...fourPart,answers:{...fourPart.answers,f60:'无',f62:'无明确主线：题材轮动快，等待持续领涨与梯队确认'}})[1].complete);
+const flat=completeManual({...emptyPaper(),answers:{f38:'空仓',f60:'无',f61:'无',f170:'无',f112_0_1:'旧买价保留'} });
+assert(requiredDailyReviews(flat).every(g=>g.complete));
+assert.equal(activeThemeRows(flat).length,0);assert.equal(candidateRows(flat).length,0);
+assert(!manualChecks(flat,3).flatMap(c=>c.ids).includes('f112_0_1'));
+assert(!manualChecks(flat,2).flatMap(c=>c.ids).includes('f70'));
+assert.equal(flat.answers.f112_0_1,'旧买价保留');
+assert(!buildReport('2026-09-24',flat,history).sections[10].facts.some(([,v])=>v==='旧买价保留'),'Hidden inactive prices must not appear as a current trade plan');
+assert(markdown('2026-09-24',flat).includes('旧买价保留'));
+assert(!requiredDailyReviews({...flat,answers:{...flat.answers,f38:'轻仓'}})[3].complete,'Resuming trade makes entry checks required again');
+assert(!requiredDailyReviews({...flat,answers:{...flat.answers,f40:'新增题材'}})[1].complete,'New research subject activates all seven checks');
+assert(!requiredDailyReviews({...flat,answers:{...flat.answers,f194:'待补充'}})[1].complete);
+assert.deepEqual(legacyAnswerGroups(fourPart),[],'Shown theme and grade fields cannot reappear as legacy duplicates');
+const changedRanking={...history,points:history.points.map(p=>p.date==='2026-09-22'?{...p,strength:p.name==='芯片'?999999:p.strength}:p)};
+const protectedTheme={...auto.paper,answers:{...auto.paper.answers,f41:'原题材逻辑，不能被新排名换题'}};
+assert.equal(applyObjectiveFill(protectedTheme,'2026-09-22',changedRanking).paper.answers.f40,protectedTheme.answers.f40);
+assert.equal(applyObjectiveFill(protectedTheme,'2026-09-22',changedRanking).paper.answers.f41,protectedTheme.answers.f41);
+const reservedThemes=applyObjectiveFill(protectedTheme,'2026-09-22',changedRanking).paper.answers;
+assert.equal(new Set([reservedThemes.f40,reservedThemes.f50,reservedThemes.f55]).size,3,'Rank refresh cannot duplicate a protected research theme');
+console.log('PASS: four-part manual gate, all seven per-theme checks, exact report wiring, no-mainline reasons, flat/no-candidate/no-theme branches, preserved inactive answers and theme identity protection');

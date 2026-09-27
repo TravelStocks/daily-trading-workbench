@@ -1,7 +1,7 @@
 import {lazy,memo,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,Download,RefreshCw,ArrowUpRight,ChevronLeft,ChevronRight,ChevronDown,Check,Settings2,ExternalLink} from 'lucide-react';
 import {emptyPaper,validDate,chinaDate,personalPlan,type Paper} from '../model';
-import {answer,answered,dailyIds,marketMetrics,cycleWindow} from '../desk-model';
+import {answer,completedProgress,progressIds,marketMetrics,cycleWindow} from '../desk-model';
 import DailyQuestionnaire from './daily-questionnaire';
 import RecapDirectory from './recap-directory';
 import PageNavigation from './page-navigation';
@@ -47,7 +47,7 @@ export default function Workspace(){
  const days=[...nodes.values()].sort((a,b)=>a.date.localeCompare(b.date));
  const shown=cycleWindow(days,date,range);
  const dateList=[...new Set(days.map(d=>d.date).concat(date))].sort(),dateIndex=dateList.indexOf(date);
- const metrics=marketMetrics(day),completed=answered(paper,dailyIds);
+ const metrics=marketMetrics(day),dailyIds=progressIds(paper),completed=completedProgress(paper);
  const heights=useMemo(()=>new Map((archive?.days||[]).map(d=>[d.date,marketLeaders(d)])),[archive]);
  const leaders=heights.get(date);
  const myCycle=answer(paper,'f143')||answer(paper,'f5');
