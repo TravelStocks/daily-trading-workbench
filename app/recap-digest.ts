@@ -1,10 +1,11 @@
 import {plain,tables,type Day} from './recap-source';
-export type Digest={date:string;headlines:{market:string;emotion:string;plan:string};marketPoints:string[];emotionPoints:string[];planPoints:string[];themes:{name:string;role:string;ladder:{name:string;board:string;role:string}[];outlook:string}[];stocks:{name:string;level:string;theme:string;role:string}[];scenarios:{name:string;level:string;signal:string;action:string;exit:string}[];plans:{type:string;stock:string;entry:string;exit:string;maxLoss:string}[]};
+import {parseLeaderCandidates,type LeaderPool} from './leader-candidates';
+export type Digest={date:string;leaderPool:LeaderPool;headlines:{market:string;emotion:string;plan:string};marketPoints:string[];emotionPoints:string[];planPoints:string[];themes:{name:string;role:string;ladder:{name:string;board:string;role:string}[];outlook:string}[];stocks:{name:string;level:string;theme:string;role:string}[];scenarios:{name:string;level:string;signal:string;action:string;exit:string}[];plans:{type:string;stock:string;entry:string;exit:string;maxLoss:string}[]};
 export function baseDigest(day?:Day):Digest{
  const t=day?.sections?.find(s=>/复盘总纲|整体盘面/.test(s.title))?.text||'';
  const group=(n:number)=>{const m=t.match(new RegExp(`(?:^|\\n)R${n} [^\\n]+\\n([^\\n]+)((?:\\n第[^\\n]+)*)`));return {title:m?.[1]||'',points:(m?.[2]||'').split('\n').filter(Boolean).map(s=>s.replace(/^第[一二三四五六七八九十]+\s*/,''))}};
  const m=group(1),e=group(2),p=group(4);
- return {date:day?.date||'',headlines:{market:m.title||day?.summary||'',emotion:e.title||day?.label||'',plan:p.title},marketPoints:m.points,emotionPoints:e.points,planPoints:p.points,themes:[],stocks:[],scenarios:[],plans:[]};
+ return {date:day?.date||'',leaderPool:{candidates:[],available:false},headlines:{market:m.title||day?.summary||'',emotion:e.title||day?.label||'',plan:p.title},marketPoints:m.points,emotionPoints:e.points,planPoints:p.points,themes:[],stocks:[],scenarios:[],plans:[]};
 }
 const entities:Record<string,string>={quot:'"',amp:'&',lt:'<',gt:'>',apos:"'",nbsp:' '};
 const decode=(s:string)=>s.replace(/&(quot|amp|lt|gt|apos|nbsp);/g,(_,n)=>entities[n]||'').replace(/&#(x[\da-f]+|\d+);/gi,(_,n)=>String.fromCodePoint(n[0].toLowerCase()==='x'?parseInt(n.slice(1),16):Number(n)));
@@ -15,7 +16,7 @@ export function parseDigest(html:string,day:Day):Digest{
  const dateMatch=title.match(/(20\d{2})[年./-](\d{1,2})[月./-](\d{1,2})/);
  const titleDate=dateMatch?[dateMatch[1],dateMatch[2].padStart(2,'0'),dateMatch[3].padStart(2,'0')].join('-'):'';
  if((declared||titleDate)!==day.date)throw Error('原文日期不匹配，未使用该页内容。');
- const digest=baseDigest(day),all=tables(html);
+ const digest=baseDigest(day),all=tables(html);digest.leaderPool=parseLeaderCandidates(html);
  for(const [n,key,points] of [[1,'market','marketPoints'],[2,'emotion','emotionPoints'],[4,'plan','planPoints']] as const){
   const start=html.search(new RegExp(`data-summary-section=["']R${n}["']`));if(start<0)continue;
   const fragment=html.slice(start),header=fragment.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)?.[1]||'';
