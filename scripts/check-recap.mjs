@@ -110,6 +110,10 @@ const knowledgeTitles=['弱修复卖点','强回流确认','大中军启动信�
 assert(knowledgeTitles.every(t=>handbook.knowledge.cards.some(c=>c.title===t&&c.text)),'All existing knowledge must survive redesigns');
 assert.deepEqual(handbook.rhythm.stages.map(s=>s.cards.length),[4,4,6,6]);assert.equal(handbook.stats.length,5);
 assert(handbook.research.url.startsWith(handbook.source+'pages/'));assert(handbook.cycle.image.startsWith(handbook.source+'assets/emotion-cycle.png'));
+assert.equal(handbook.cycle.annotatedImage,handbook.source+'assets/emotion-cycle-annotated.png');
+const handbookView=fs.readFileSync('app/workspace/trading-handbook.tsx','utf8');
+assert(handbookView.includes('handbook.cycle.image')&&handbookView.includes('handbook.cycle.annotatedImage'));
+assert.equal((handbookView.match(/className="cycle-map-figure"/g)||[]).length,2);
 assert(handbook.knowledge.cards.every(c=>!c.emphasis||c.text.includes(c.emphasis)));
 const {openingRows,openingConditions,profitModel,inputNumber}=await import(moduleUrl(fs.readFileSync('app/limit-up-model.ts','utf8')));
 const near=(a,b)=>assert(Math.abs(a-b)<1e-9,`${a} differs from ${b}`);
