@@ -26,6 +26,28 @@ export function parseStockBars(payload,code,source){
  return Object.fromEntries(payload.data.klines.map(line=>{const c=line.split(',');return [c[0],{date:c[0],open:number(c[1]),close:number(c[2]),high:number(c[3]),low:number(c[4]),volume:number(c[5]),amount:number(c[6]),pct:number(c[8]),change:number(c[9]),turnover:number(c[10]),source}]}));
 }
 
+export function mergeBars(saved={},fresh={}){
+ const merged={...saved};
+ for(const [date,row] of Object.entries(fresh)){
+  if(row.date!==date)continue;
+  merged[date]={...saved[date],...Object.fromEntries(Object.entries(row).filter(([,v])=>v!==null&&v!==undefined))};
+ }
+ return merged;
+}
+
+export function parseTencentClose(payload,key,source){
+ const item=payload?.data?.[key],q=item?.qt?.[key],stamp=String(q?.[30]||'');
+ if(payload?.code!==0||q?.[2]!==key.slice(2)||!/^\d{14}$/.test(stamp)||stamp.slice(8,12)<'1500')throw Error('备用行情不是已完成的同标的收盘');
+ const date=`${stamp.slice(0,4)}-${stamp.slice(4,6)}-${stamp.slice(6,8)}`,b=item.day?.find(r=>r[0]===date);
+ if(!b||!(number(q[4])>0)||Math.abs(Number(b[2])-Number(q[3]))>0.005)throw Error('备用日线与收盘参考价不匹配');
+ return {[date]:{date,open:number(b[1]),close:number(b[2]),high:number(b[3]),low:number(b[4]),volume:number(q[36]),amount:number(q[37])===null?null:Number(q[37])*1e4,pct:(Number(b[2])/Number(q[4])-1)*100,turnover:number(q[38]),source}};
+}
+
+export function keepVerifiedSection(saved,fresh){
+ if(saved?.id===fresh.id&&saved.status==='complete'&&fresh.status!=='complete')return {...saved,retained:true,note:saved.note.replace(/ 本次刷新.*$/,'')+' 本次刷新不完整，保留此前同日已核数据。'};
+ return fresh;
+}
+
 export function parseThemeDetails(payload,date){
  const base=parseLimitUps(payload,date),chunks=payload.html.split(/(?=<div\b[^>]*class=['"][^'"]*\bztitem\b)/i).filter(s=>/^<div\b/.test(s));
  return base.groups.map((g,index)=>{
@@ -82,6 +104,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  if(!dates.length)throw Error('所选区间没有已收盘交易日');
  console.log(`Baseline ${dates.join(', ')}`);
  const rankings={},themes={},pools={...context.promotionPools},bars={},strengthPoints=[];
+ const savedQuotes=old.quoteCache||{stocks:{},indices:{}};
  await each(needed,async date=>{
   rankings[date]=await attempt(`${date} raw strength`,async()=>parseStrength(await post('getPlateRotatData',{from:'kaipan',days:'1',dates:`${date} - ${date}`}),date));
   await attempt(`${date} theme details`,async()=>{const c=await post('getFupanDate',{date,type:'choose'});if(c.date!==date)throw Error('日期回退');const p=await post('getFupanByYidong',{date,type:'plate'});themes[date]=parseThemeDetails(p,date);pools[date]=parseDxxPool(p,date)});
@@ -94,12 +117,23 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  }));
  const stockUrl=(id)=>`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${id}&klt=101&fqt=0&beg=${needed[0].replaceAll('-','')}&end=${end.replaceAll('-','')}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
  const indices={};
- await each([['沪指','1.000001'],['深指','0.399001'],['创业板','0.399006'],['科创50','1.000688']],async([name,id])=>{indices[name]=await attempt(name,async()=>parseStockBars(await get(stockUrl(id)),id.split('.')[1],stockUrl(id)),{})});
+ async function history(id,saved={}){
+  // Completed dated observations are immutable inputs; only fetch missing sessions.
+  if(dates.every(d=>Number.isFinite(saved[d]?.pct)&&Number.isFinite(saved[d]?.close)))return saved;
+  const source=stockUrl(id);
+  const fresh=await attempt(id,async()=>parseStockBars(await get(source),id.split('.')[1],source));
+  if(fresh)return mergeBars(saved,fresh);
+  const key=(id.startsWith('1.')?'sh':'sz')+id.split('.')[1];
+  const fallback=`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${key},day,${needed[0]},${end},90,`;
+  const latest=await attempt(`${id} fallback`,async()=>parseTencentClose(await get(fallback),key,fallback),{});
+  return mergeBars(saved,Object.fromEntries(Object.entries(latest).filter(([d])=>d<=end)));
+ }
+ await each([['沪指','1.000001'],['深指','0.399001'],['创业板','0.399006'],['科创50','1.000688']],async([name,id])=>{indices[name]=await history(id,savedQuotes.indices?.[name])});
  const dataUrl=(report,filter,size=500,page=1)=>'https://datacenter-web.eastmoney.com/api/data/v1/get?'+new URLSearchParams({reportName:report,columns:'ALL',filter,pageNumber:String(page),pageSize:String(size),source:'WEB',client:'WEB'});
  const ipoSource=dataUrl('RPTA_APP_IPOAPPLY',`(LISTING_DATE>='${needed[0]}')(LISTING_DATE<='${end}')`);
  const ipo=await attempt('new stocks',async()=>{const j=await get(ipoSource);if(!j.success||j.result?.pages>1)throw Error('新股来源不完整');return (j.result?.data||[]).filter(s=>/^[036]\d{5}$/.test(s.SECURITY_CODE)).map(s=>({code:s.SECURITY_CODE,name:s.SECURITY_NAME,listingDate:s.LISTING_DATE.slice(0,10),issuePrice:number(s.ISSUE_PRICE)}))});
  const universe=new Map(needed.flatMap(d=>[...(pools[d]?.stocks||[]),...(context.marketRiskDays?.[d]?.brokenStocks||[]),...(context.marketRiskDays?.[d]?.breakCohort||[]) ]).concat(ipo||[]).map(s=>[s.code,s]));
- await each([...universe],async([code])=>{const u=stockUrl(`${code.startsWith('6')?'1':'0'}.${code}`);bars[code]=await attempt(code,async()=>parseStockBars(await get(u),code,u),{})});
+ await each([...universe],async([code])=>{bars[code]=await history(`${code.startsWith('6')?'1':'0'}.${code}`,savedQuotes.stocks?.[code])});
  console.log(`Retrieved ${Object.keys(bars).length} stock histories; ${strengthPoints.length} strength observations`);
  const turnoverSource='https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=20&po=1&np=1&fltt=2&invt=2&fid=f6&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f6,f8,f13,f124';
  const liveTurnover=await attempt('turnover top20',async()=>{const j=await get(turnoverSource);const r=j.data?.diff;if(!Array.isArray(r)||r.length!==20)throw Error('排行不足20');return r});
@@ -189,12 +223,14 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   const foreign=context.quotes.map(q=>{const row=q.rows.filter(r=>r.date<=date).at(-1);return [q.name,row?.date||null,row?.close??null,row?.pct??null,q.region]});
   sections.push(section('overseas','已配置外围观察',['标的','实际交易日','收盘','日涨幅（%）','市场'],foreign,'美股当晚收盘作为次日盘前资料；早于目标日的行保留实际日期，不混为当日。',context.quotes.map(q=>q.source),foreign.every(r=>r[1]===date)?'complete':'partial'));
   const topThemes=(rankings[date]||[]).slice(0,5),height=Math.max(0,...(pool?.stocks||[]).map(s=>s.boards));
-  for(let si=0;si<sections.length;si++){if(sections[si].status==='missing'){const saved=old.days?.[date]?.sections?.find(s=>s.id===sections[si].id&&s.status==='complete');if(saved)sections[si]={...saved,note:saved.note+' 本次刷新未取得，保留此前同日已核数据。'}}}
+  for(let si=0;si<sections.length;si++)sections[si]=keepVerifiedSection(old.days?.[date]?.sections?.find(s=>s.id===sections[si].id),sections[si]);
+  for(const [key,value] of Object.entries(metrics))if(value==='待核'&&old.days?.[date]?.metrics?.[key])metrics[key]=old.days[date].metrics[key];
   const gaps=sections.filter(s=>s.status!=='complete').map(s=>({id:s.id,title:s.title,status:s.status,note:s.note}));
   days[date]={date,previousDate,fetchedAt,asOf:`${date} 盘后；海外另标实际交易日`,metrics,topThemes,strengthPoints:strengthPoints.filter(p=>p.date<=date&&p.date>=sessions[Math.max(0,sessions.indexOf(date)-3)]&&topThemes.some(t=>t.code===p.code)),highest:{count:height||null,names:(pool?.stocks||[]).filter(s=>s.boards===height).map(s=>s.name)},sections,gaps,status:gaps.length?'partial':'complete',scope:'来源分别标注；不单列ST/北交所，不改写已有全市场统计口径。'};
   console.log(`${date}: ${sections.filter(s=>s.status==='complete').length}/${sections.length} complete sections; ${topThemes.length} top themes`);
  }
- const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors};
+ const trim=groups=>Object.fromEntries(Object.entries(groups).map(([key,rows])=>[key,Object.fromEntries(Object.entries(rows).filter(([d])=>d>=sessions[0]&&d<=today))]).filter(([,rows])=>Object.keys(rows).length));
+ const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;
 }
