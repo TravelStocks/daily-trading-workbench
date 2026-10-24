@@ -1,9 +1,17 @@
 name: Refresh public market context
 on:
   workflow_dispatch:
+    inputs:
+      from:
+        description: First historical session to backfill (YYYY-MM-DD)
+        required: false
+      to:
+        description: Last historical session to backfill (YYYY-MM-DD)
+        required: false
   schedule:
-    # Beijing 08:15 pre-market and 17:15 after Asian closes.
-    - cron: '15 0,9 * * 1-6'
+    # Beijing 08:15 / 17:15 / 22:15, plus best-effort 09:27 auction capture.
+    - cron: '15 0,9,14 * * 1-6'
+    - cron: '27 1 * * 1-5'
 permissions:
   contents: write
 concurrency:
@@ -12,19 +20,38 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs scripts/promotions.test.mjs scripts/promotion-feedback.test.mjs
-      - run: node scripts/sync-market-context.mjs
+      - name: Capture final auction when on time
+        if: github.event.schedule == '27 1 * * 1-5'
+        run: node scripts/capture-auction.mjs
+      - run: node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs scripts/promotions.test.mjs scripts/promotion-feedback.test.mjs scripts/daily-baseline.test.mjs
+      - name: Refresh existing market feed
+        if: github.event.schedule != '27 1 * * 1-5'
+        continue-on-error: true
+        run: node scripts/sync-market-context.mjs
+      - name: Collect recap-independent baseline
+        if: github.event.schedule != '27 1 * * 1-5'
+        env:
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+        run: |
+          args=()
+          if [ -n "$FROM" ]; then args+=(--from "$FROM"); fi
+          if [ -n "$TO" ]; then args+=(--to "$TO"); fi
+          node scripts/sync-daily-baseline.mjs "${args[@]}" --cache-dir "$RUNNER_TEMP/baseline-evidence"
       - name: Commit public observations
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add public/data/market-context.json docs/data/market-context.json
+          for file in daily-baseline.json auction-snapshots.json; do
+            if [ -f "public/data/$file" ]; then git add "public/data/$file" "docs/data/$file"; fi
+          done
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh public market observations'
             git push

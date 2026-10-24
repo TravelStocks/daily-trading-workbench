@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {number,parseStrength,cohortStats,followUp,parseStockBars} from './daily-baseline.mjs';
+import {auctionWindow,auctionQuote} from './capture-auction.mjs';
+test('missing is not zero',()=>{assert.equal(number(null),null);assert.equal(number(''),null);assert.equal(number(0),0)});
+test('rank validates date and keeps signed strength',()=>{const html='2026-10-16'+[5,3,1,0,-1].map((n,i)=>`<td code='${i}' name='t${i}'><span>t${i}</span><span>${n}</span></td>`).join('');assert.equal(parseStrength({html},'2026-10-16')[4].strength,-1);assert.throws(()=>parseStrength({html},'2026-10-19'))});
+test('cohort includes winners and losers, reports missing',()=>{const r=cohortStats([{code:'1'},{code:'2'},{code:'3'}],'d',{1:{d:{pct:10}},2:{d:{pct:-4}}});assert.equal(r.total,3);assert.equal(r.known,2);assert.equal(r.mean,3)});
+test('follow-up is after event, no lookahead or suspension shift',()=>{const r=followUp('d0',[{code:'1'}],['d0','d1','d2','d3'],{1:{d0:{pct:10},d2:{pct:5},d3:{pct:9}}},'d2');assert.equal(r[0].date,'d1');assert.equal(r[0].known,0);assert.equal(r[1].mean,5);assert.equal(r[2].pending,true)});
+test('historical quote identity validated',()=>{assert.throws(()=>parseStockBars({data:{code:'000001',klines:[]}},'000002','url'))});
+test('late scheduler cannot turn continuous-market quote into auction',()=>{assert.equal(auctionWindow(new Date('2026-10-23T01:27:00Z')),true);assert.equal(auctionWindow(new Date('2026-10-23T01:31:00Z')),false);const row={f124:Date.parse('2026-10-23T01:31:00Z')/1000,f2:11,f17:11,f18:10};assert.equal(auctionQuote(row,'2026-10-23'),null)});

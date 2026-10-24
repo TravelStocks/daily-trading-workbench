@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowUp,ArrowUpRight} from 'lucide-react';
 
-const sections=[['handbook','交易手册'],['external','外围市场'],['overview','市场概览'],['themes','题材强度'],['recap','每日复盘'],['exam','决策考卷'],['report','汇总报告']];
+const sections=[['handbook','交易手册'],['external','外围市场'],['objective-data','客观数据'],['overview','市场概览'],['themes','题材强度'],['recap','每日复盘'],['exam','决策考卷'],['report','汇总报告']];
 
 export default function PageNavigation({ready,completed,total}:{ready:boolean;completed:number;total:number}){
  const [active,setActive]=useState('handbook');

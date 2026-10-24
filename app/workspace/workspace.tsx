@@ -18,6 +18,8 @@ import {applyObjectiveFill} from '../autofill';
 import {publicRoot,type Archive} from '../recap-source';
 import SectorExplorer from './sector-explorer';
 import MarketRisk from './market-risk';
+import DailyBaseline from './daily-baseline';
+import {useBaseline} from '../daily-baseline';
 const DailyReport=lazy(()=>import('./daily-report'));
 const ThemeExplorer=memo(SectorExplorer);
 import './workspace.css';
@@ -30,6 +32,7 @@ import './tesla-theme.css';
 const tone=(s:string)=>/分歧|退潮|冰点/.test(s)?'cold':/回流|修复|反弹/.test(s)?'return':/高潮|主升|发酵/.test(s)?'warm':'neutral';
 function download(name:string,value:unknown){const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 export default function Workspace(){
+ const baseline=useBaseline();
  const [requiredAttemptDate,setRequiredAttemptDate]=useState('');
  const [archive,setArchive]=useState<Archive|null>(null),[records,setRecords]=useState<Saved[]>([]),[date,setDate]=useState(chinaDate()),[paper,setPaper]=useState<Paper>(emptyPaper),[ready,setReady]=useState(false),[status,setStatus]=useState('正在读取资料'),[error,setError]=useState(''),[syncing,setSyncing]=useState(false),[range,setRange]=useState('20'),[sourceOpen,setSourceOpen]=useState(false),[chapter,setChapter]=useState<number|null>(0),[showReport,setShowReport]=useState(false),[importNote,setImportNote]=useState('');
  const state=useRef({date:chinaDate(),paper:emptyPaper(),revision:0,dirty:false}),readyRef=useRef(false),archiveRef=useRef<Archive|null>(null),busy=useRef(false),blocked=useRef(false),timer=useRef<ReturnType<typeof setTimeout>|null>(null),file=useRef<HTMLInputElement>(null),track=useRef<HTMLDivElement>(null);
@@ -47,9 +50,14 @@ export default function Workspace(){
  const days=[...nodes.values()].sort((a,b)=>a.date.localeCompare(b.date));
  const shown=cycleWindow(days,date,range);
  const dateList=[...new Set(days.map(d=>d.date).concat(date))].sort(),dateIndex=dateList.indexOf(date);
- const metrics=marketMetrics(day),dailyIds=progressIds(paper),completed=completedProgress(paper);
+ const objective=baseline?.days[date];
+ const metrics=objective?[
+  ['沪指',objective.metrics['沪指']],['深指',objective.metrics['深指']],['创业',objective.metrics['创业板']],['科创',objective.metrics['科创50']],
+  ['沪深成交额',objective.metrics['成交额']],['涨跌停家数',objective.metrics['涨跌停']],['上涨 / 下跌',objective.metrics['涨跌家数']],
+  ...['一板','二板','三板','高度板','封板率','断板'].map(k=>[k,objective.metrics[k]||'待核']),
+ ]:marketMetrics(day),dailyIds=progressIds(paper),completed=completedProgress(paper);
  const heights=useMemo(()=>new Map((archive?.days||[]).map(d=>[d.date,marketLeaders(d)])),[archive]);
- const leaders=heights.get(date);
+ const leaders=objective?.highest||heights.get(date);
  const myCycle=answer(paper,'f143')||answer(paper,'f5');
  function goReport(){setShowReport(true);document.getElementById('report')?.scrollIntoView({behavior:'smooth'})}
  const requiredGroups=requiredDailyReviews(paper),requiredComplete=requiredGroups.filter(g=>g.complete).length;
@@ -70,7 +78,8 @@ export default function Workspace(){
  {!ready?<div className="desk-loading"><RefreshCw size={22} className="spinning"/><h2>正在准备当天的复盘资料</h2><p>读取市场数据、题材走势与已保存答卷。</p></div>:<>
  <TradingHandbook/>
  <ExternalMarkets date={date}/>
- <section id="overview" className="market-section"><div className="market-date-row"><span>{date.replaceAll('-',' / ')}<b>盘后复盘</b></span><span className="data-status"><Check size={13}/>{day?(archive?.source==='live'?'同日复盘已同步':'已载入同日资料'):'等待当天复盘'}</span></div><div className="current-cycle"><div><span className="section-kicker">所选日情绪周期 · {date}</span><h2 className={tone(day?.label||'')}>{day?.label||'待当日复盘'}</h2><p>复盘原文标注{day?.url&&<> · <a href={day.url} target="_blank" rel="noreferrer">查看来源 ↗</a></>}</p></div><div className="market-highest"><span>当日市场最高连板</span><strong>{leaders?.count!=null?<>{leaders.count}<small> 连板</small></>:'待核实'}</strong><p>{leaders?.names.length?leaders.names.join(' / '):'对应个股待同日原文核实'}</p><small>{date} · {leaders?.names.length&&leaders.names.length>1?'并列最高':'复盘口径'}</small></div><div className="my-cycle"><span>我的收盘判断</span><strong>{myCycle||'待填写'}</strong><a href="#exam">{myCycle?'修改判断':'填写考卷'} ↗</a></div></div><div className="overview-label"><h3>当日市场数据</h3><span>自动同步 · 保留原文口径</span></div><div className="market-metrics">{[{title:'主要指数',note:'收盘点位 / 涨跌幅',items:metrics.slice(0,4),kind:'indices'},{title:'量能与市场广度',note:'成交、涨跌与极端表现',items:metrics.slice(4,7),kind:'breadth'},{title:'连板梯队',note:'高度与晋级表现',items:metrics.slice(7),kind:'ladder'}].map(group=><div className={'metric-group '+group.kind} key={group.kind}><div className="metric-group-label"><h4>{group.title}</h4><span>{group.note}</span></div><div className="market-strip">{group.items.map(([k,v])=><div key={k}><small>{k}</small><strong>{v}</strong></div>)}</div></div>)}</div><MarketRisk date={date}/>{archive?.syncNote&&<p className="desk-notice">{archive.syncNote}</p>}
+ <DailyBaseline day={objective} dates={Object.keys(baseline?.days||{}).sort().reverse()} onSelect={d=>archive&&select(d,archive)}/>
+ <section id="overview" className="market-section"><div className="market-date-row"><span>{date.replaceAll('-',' / ')}<b>盘后复盘</b></span><span className="data-status"><Check size={13}/>{day?(archive?.source==='live'?'同日复盘已同步':'已载入同日资料'):objective?'已载入独立客观数据':'等待当天客观数据'}</span></div><div className="current-cycle"><div><span className="section-kicker">所选日情绪周期 · {date}</span><h2 className={tone(day?.label||'')}>{day?.label||'待当日复盘'}</h2><p>复盘原文标注{day?.url&&<> · <a href={day.url} target="_blank" rel="noreferrer">查看来源 ↗</a></>}</p></div><div className="market-highest"><span>当日市场最高连板</span><strong>{leaders?.count!=null?<>{leaders.count}<small> 连板</small></>:'待核实'}</strong><p>{leaders?.names.length?leaders.names.join(' / '):'对应个股待同日原文核实'}</p><small>{date} · {leaders?.names.length&&leaders.names.length>1?'并列最高':'复盘口径'}</small></div><div className="my-cycle"><span>我的收盘判断</span><strong>{myCycle||'待填写'}</strong><a href="#exam">{myCycle?'修改判断':'填写考卷'} ↗</a></div></div><div className="overview-label"><h3>当日市场数据</h3><span>自动同步 · 客观数据优先，来源分别保留</span></div><div className="market-metrics">{[{title:'主要指数',note:'收盘点位 / 涨跌幅',items:metrics.slice(0,4),kind:'indices'},{title:'量能与市场广度',note:'成交、涨跌与极端表现',items:metrics.slice(4,7),kind:'breadth'},{title:'连板梯队',note:'高度与晋级表现',items:metrics.slice(7),kind:'ladder'}].map(group=><div className={'metric-group '+group.kind} key={group.kind}><div className="metric-group-label"><h4>{group.title}</h4><span>{group.note}</span></div><div className="market-strip">{group.items.map(([k,v])=><div key={k}><small>{k}</small><strong>{v}</strong></div>)}</div></div>)}</div><MarketRisk date={date}/>{archive?.syncNote&&<p className="desk-notice">{archive.syncNote}</p>}
  <div className="cycle-panel"><div className="cycle-heading"><div><h2>市场情绪周期节点</h2><p>原复盘节点与你的收盘判断按日期排列；点击切换整页。</p></div><label>观察范围<select aria-label="周期观察范围" value={range} onChange={e=>setRange(e.target.value)}><option value="20">所选日前后 20 个记录日</option><option value="60">所选日前后 60 个记录日</option><option value="all">全部周期</option></select></label></div><div className="cycle-track" ref={track}>{shown.map(d=><button key={d.date} aria-pressed={d.date===date} className={'cycle-node '+tone(d.label)+(d.date===date?' selected':'')} onClick={()=>select(d.date,archive!)}><time>{d.date.slice(5)}</time><span className="node-dot"/><strong>{d.label||'未标注'}</strong><span className="node-height">{heights.get(d.date)?.count!=null?`${heights.get(d.date)!.count} 连板`: '高度待核'}</span><span className="node-leaders">{heights.get(d.date)?.names.join(' / ')||'个股待核实'}</span><small>{d.personal?'我的判断':'复盘原文'}</small></button>)}</div></div></section>
  <ThemeExplorer archive={archive!} anchor={date}/>
  <section id="recap" className="recap-content"><div className="section-heading"><div><span className="section-kicker">第一步 / {date}</span><h2>看清今日，才能安排明日</h2><p>从指数到情绪，从题材梯队到关键标的；先完成事实归档，再谈交易判断。</p></div><a href="#exam" className="text-link">写下判断 ↓</a></div><RecapDigest day={day}/>{day?<div className="recap-source-bar"><div className="recap-source-copy"><span className="recap-source-icon"><BookOpen size={19}/></span><span><b>当日复盘底稿</b><small>{date} · 保留完整内容与原始口径</small></span></div><div className="recap-source-actions"><button className="recap-source-expand" aria-expanded={sourceOpen} onClick={()=>setSourceOpen(!sourceOpen)}>{sourceOpen?'收起站内原文':'站内展开完整原文'}<ChevronDown size={15}/></button><a className="recap-source-primary" href={day.url} target="_blank" rel="noreferrer">打开完整复盘<ExternalLink size={15}/></a></div></div>:<div className="desk-empty">这一天的复盘还未发布。可以先写自己的判断，同日资料发布后会自动补充。</div>}
