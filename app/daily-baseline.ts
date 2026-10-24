@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import type {Point} from './recap-source';
-export type BaselineSection={id:string;title:string;columns:string[];rows:(string|number|null)[][];note:string;sources:string[];status:'complete'|'partial'|'missing'};
+export type BaselineSection={id:string;title:string;columns:string[];rows:(string|number|null)[][];note:string;sources:string[];status:'complete'|'partial'|'missing';history?:{label:string;lines:string[]}[]};
 export type BaselineDay={date:string;previousDate:string;fetchedAt:string;status:string;metrics:Record<string,string>;topThemes:{name:string;code:string;rank:number;strength:number}[];strengthPoints:Point[];highest:{count:number|null;names:string[]};sections:BaselineSection[];gaps:{id:string;title:string;note:string}[]};
 export type Baseline={version:1;updatedAt:string;days:Record<string,BaselineDay>;sessions:string[]};
 let pending:Promise<Baseline>|undefined,loaded=0;

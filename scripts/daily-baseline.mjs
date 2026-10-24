@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {parseDxxPool,promotionDay} from './promotions.mjs';
 import {parseLimitUps} from './duanxianxia.mjs';
+import {buildCrowdingWatch,crowdingSection,parseAdjustedSeries,parseTencentAdjusted,parseSohuHistory} from './crowding-watch.mjs';
 
 export const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
 export const plain=s=>String(s??'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
@@ -115,14 +116,20 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   if(!Array.isArray(r.date)||r.date.length!==r.series1?.length||r.legend!==name)throw Error('强度历史身份不符');
   r.date.forEach((stamp,i)=>{const matching=needed.filter(d=>d===stamp||d.slice(5)===stamp);if(matching.length===1&&number(r.series1[i])!==null)strengthPoints.push({date:matching[0],name,code,strength:number(r.series1[i]),state:'',raw:String(r.series1[i]),sourceDate:matching[0],url:sourceRank})});
  }));
- const stockUrl=(id)=>`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${id}&klt=101&fqt=0&beg=${needed[0].replaceAll('-','')}&end=${end.replaceAll('-','')}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
+ const stockUrl=(id,begin=needed[0])=>`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${id}&klt=101&fqt=0&beg=${begin.replaceAll('-','')}&end=${end.replaceAll('-','')}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
  const indices={};
- async function history(id,saved={}){
+ const watchCodes=new Map();
+ async function history(id,saved={},required=dates,begin=needed[0]){
   // Completed dated observations are immutable inputs; only fetch missing sessions.
-  if(dates.every(d=>Number.isFinite(saved[d]?.pct)&&Number.isFinite(saved[d]?.close)))return saved;
-  const source=stockUrl(id);
+  if(required.every(d=>Number.isFinite(saved[d]?.pct)&&Number.isFinite(saved[d]?.close)))return saved;
+  const source=stockUrl(id,begin);
   const fresh=await attempt(id,async()=>parseStockBars(await get(source),id.split('.')[1],source));
   if(fresh)return mergeBars(saved,fresh);
+  if(watchCodes.has(id.split('.')[1])){
+   const code=id.split('.')[1],url=`https://q.stock.sohu.com/hisHq?code=cn_${code}&start=${begin.replaceAll('-','')}&end=${end.replaceAll('-','')}&stat=1&order=A&period=d&rt=json`;
+   const alternate=await attempt(`${id} historical fallback`,async()=>parseSohuHistory(await get(url),code,url,begin,end));
+   if(alternate&&Object.keys(alternate).length)return mergeBars(alternate,saved);
+  }
   const key=(id.startsWith('1.')?'sh':'sz')+id.split('.')[1];
   const fallback=`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${key},day,${needed[0]},${end},90,`;
   const latest=await attempt(`${id} fallback`,async()=>parseTencentClose(await get(fallback),key,fallback),{});
@@ -133,7 +140,30 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const ipoSource=dataUrl('RPTA_APP_IPOAPPLY',`(LISTING_DATE>='${needed[0]}')(LISTING_DATE<='${end}')`);
  const ipo=await attempt('new stocks',async()=>{const j=await get(ipoSource);if(!j.success||j.result?.pages>1)throw Error('新股来源不完整');return (j.result?.data||[]).filter(s=>/^[036]\d{5}$/.test(s.SECURITY_CODE)).map(s=>({code:s.SECURITY_CODE,name:s.SECURITY_NAME,listingDate:s.LISTING_DATE.slice(0,10),issuePrice:number(s.ISSUE_PRICE)}))});
  const universe=new Map(needed.flatMap(d=>[...(pools[d]?.stocks||[]),...(context.marketRiskDays?.[d]?.brokenStocks||[]),...(context.marketRiskDays?.[d]?.breakCohort||[]) ]).concat(ipo||[]).map(s=>[s.code,s]));
- await each([...universe],async([code])=>{bars[code]=await history(`${code.startsWith('6')?'1':'0'}.${code}`,savedQuotes.stocks?.[code])});
+ const watchPools={...old.crowdingWatch?.pools,...pools};
+ for(const [d,p] of Object.entries(watchPools).sort(([a],[b])=>a.localeCompare(b)))if(d<=end&&p?.complete)for(const s of p.stocks)if(s.boards>=4&&!watchCodes.has(s.code))watchCodes.set(s.code,{...s,entryDate:d});
+ for(const r of old.crowdingWatch?.records||[])if(r.entryDate<=end&&!watchCodes.has(r.code))watchCodes.set(r.code,r);
+ for(const [code,s] of watchCodes)universe.set(code,s);
+ await each([...universe],async([code])=>{const entry=watchCodes.get(code)?.entryDate,begin=entry?sessions[Math.max(0,sessions.indexOf(entry)-5)]:needed[0];bars[code]=await history(`${code.startsWith('6')?'1':'0'}.${code}`,savedQuotes.stocks?.[code],entry?sessions.filter(d=>d>=begin):dates,begin)});
+ const adjusted={...old.crowdingAdjusted};
+ await each([...watchCodes],async([code])=>{
+  const id=`${code.startsWith('6')?'1':'0'}.${code}`;
+  if(!adjusted[code]?.rows?.[dates.at(-1)]){
+   const url=stockUrl(id,sessions[0]).replace('fqt=0','fqt=1');
+   const fresh=await attempt(`${code} adjusted MA history`,async()=>parseAdjustedSeries(await get(url),code,url));
+   if(fresh)adjusted[code]=fresh;
+   else {
+    const key=(code.startsWith('6')?'sh':'sz')+code,url=`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${key},day,${sessions[0]},${end},90,qfq`;
+    const fallback=await attempt(`${code} adjusted MA fallback`,async()=>parseTencentAdjusted(await get(url),key,url));
+    if(fallback)adjusted[code]=fallback;
+   }
+  }
+  if(!Number.isFinite(bars[code]?.[dates.at(-1)]?.totalCap)){
+   const url=`https://push2.eastmoney.com/api/qt/stock/get?secid=${id}&fltt=2&fields=f57,f58,f86,f116,f117`;
+   await attempt(`${code} dated capitalization`,async()=>{const {data:q}=await get(url);const stamp=number(q?.f86);if(q?.f57!==code||!stamp)throw Error('市值身份或时间缺失');const d=chinaDate(stamp*1000);if(d>end||!bars[code]?.[d]||new Date(stamp*1000+28800000).getUTCHours()<15)throw Error('市值不是目标已收盘日期');bars[code][d]={...bars[code][d],totalCap:number(q.f116),floatCap:number(q.f117),capitalizationSource:url};});
+  }
+ });
+ const crowdingWatch=buildCrowdingWatch({previous:old.crowdingWatch,sessions,pools:watchPools,quotes:{...savedQuotes.stocks,...bars},adjusted,themes,asOf:[old.crowdingWatch?.asOf,end].filter(Boolean).sort().at(-1)});
  console.log(`Retrieved ${Object.keys(bars).length} stock histories; ${strengthPoints.length} strength observations`);
  const turnoverSource='https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=20&po=1&np=1&fltt=2&invt=2&fid=f6&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f6,f8,f13,f124';
  const liveTurnover=await attempt('turnover top20',async()=>{const j=await get(turnoverSource);const r=j.data?.diff;if(!Array.isArray(r)||r.length!==20)throw Error('排行不足20');return r});
@@ -222,6 +252,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   sections.push(section('announcements','监管 / 催化与证伪公告线索',['披露时间','个股','标题','原文'],selected.map(s=>[s.display_time||s.notice_date,s.codes.map(c=>`${c.short_name} ${c.stock_code}`).join(' / '),s.title,`https://data.eastmoney.com/notices/detail/${s.codes[0]?.stock_code}/${s.art_code}.html`]),'公告列表为东方财富转引，包含盘后披露；标题只作待核线索，不自动判定催化成立。政策原文及逐条证伪、有效期须进一步核验。',[noticeBase+new URLSearchParams({begin_time:date,end_time:date,ann_type:'A'})],notices?'partial':'missing'));
   const foreign=context.quotes.map(q=>{const row=q.rows.filter(r=>r.date<=date).at(-1);return [q.name,row?.date||null,row?.close??null,row?.pct??null,q.region]});
   sections.push(section('overseas','已配置外围观察',['标的','实际交易日','收盘','日涨幅（%）','市场'],foreign,'美股当晚收盘作为次日盘前资料；早于目标日的行保留实际日期，不混为当日。',context.quotes.map(q=>q.source),foreign.every(r=>r[1]===date)?'complete':'partial'));
+  sections.push(crowdingSection(crowdingWatch,date));
   const topThemes=(rankings[date]||[]).slice(0,5),height=Math.max(0,...(pool?.stocks||[]).map(s=>s.boards));
   for(let si=0;si<sections.length;si++)sections[si]=keepVerifiedSection(old.days?.[date]?.sections?.find(s=>s.id===sections[si].id),sections[si]);
   for(const [key,value] of Object.entries(metrics))if(value==='待核'&&old.days?.[date]?.metrics?.[key])metrics[key]=old.days[date].metrics[key];
@@ -230,7 +261,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   console.log(`${date}: ${sections.filter(s=>s.status==='complete').length}/${sections.length} complete sections; ${topThemes.length} top themes`);
  }
  const trim=groups=>Object.fromEntries(Object.entries(groups).map(([key,rows])=>[key,Object.fromEntries(Object.entries(rows).filter(([d])=>d>=sessions[0]&&d<=today))]).filter(([,rows])=>Object.keys(rows).length));
- const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
+ const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;
 }

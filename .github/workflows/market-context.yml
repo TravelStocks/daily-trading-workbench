@@ -29,7 +29,7 @@ jobs:
       - name: Capture final auction when on time
         if: github.event.schedule == '27 1 * * 1-5'
         run: node scripts/capture-auction.mjs
-      - run: node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs scripts/promotions.test.mjs scripts/promotion-feedback.test.mjs scripts/daily-baseline.test.mjs
+      - run: node --test scripts/market-data.test.mjs scripts/duanxianxia.test.mjs scripts/promotions.test.mjs scripts/promotion-feedback.test.mjs scripts/daily-baseline.test.mjs scripts/crowding-watch.test.mjs
       - name: Refresh existing market feed
         if: github.event.schedule != '27 1 * * 1-5'
         continue-on-error: true
