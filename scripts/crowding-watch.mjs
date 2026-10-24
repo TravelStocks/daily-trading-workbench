@@ -65,6 +65,15 @@ export function buildCrowdingWatch({previous={},sessions,pools={},quotes={},adju
       const record={id,code:s.code,name:s.name,entryDate:date,entryBoards:s.boards,
         entrySource:pool?.source||prior?.entrySource,scopeKey:pool?.scopeKey||prior?.scopeKey,
         peakBoards:s.boards,breakDate:null,observed:0,negativeStreak:0,exitDate:null,observations:[]};
+      const entryIndex=calendar.indexOf(date);
+      record.leadIn=calendar.slice(Math.max(0,entryIndex-5),entryIndex).map(d=>{
+        const saved=prior?.leadIn?.find(o=>o.date===d),q=quotes[s.code]?.[d]||saved?.quote||{},i=calendar.indexOf(d);
+        const priorVolumes=calendar.slice(Math.max(0,i-5),i).map(p=>quotes[s.code]?.[p]?.volume??null);
+        return {date:d,offset:i-entryIndex,quote:q,negativeStreak:0,
+          volumeVsPrevious:ratio(q.volume,quotes[s.code]?.[calendar[i-1]]?.volume)??saved?.volumeVsPrevious??null,
+          volumeVs5:(priorVolumes.length===5?ratio(q.volume,mean(priorVolumes)):null)??saved?.volumeVs5??null,
+          structure:adjusted[s.code]?.rows?.[d]?priceStructure(adjusted[s.code],d):saved?.structure||priceStructure(null,d)};
+      });
       records.push(record);active.set(s.code,record);
     }
     const daily=[];
@@ -86,7 +95,7 @@ export function buildCrowdingWatch({previous={},sessions,pools={},quotes={},adju
       const themeEvidence=themeNames.length?themeNames.map(name=>({name,date})):prior?.themes||inherited;
       const obs={date,offset:position-calendar.indexOf(r.entryDate),quote:valid?q:{...q,pct:null},valid,
         boards:current?.boards??(pool?.complete&&pool.scopeKey===r.scopeKey&&valid?0:null),
-        volumeVsPrevious:ratio(q.volume,priorVolume),volumeVs5:volumeRows.length===5?ratio(q.volume,mean(volumeRows)):null,
+        volumeVsPrevious:ratio(q.volume,priorVolume)??prior?.volumeVsPrevious??null,volumeVs5:(volumeRows.length===5?ratio(q.volume,mean(volumeRows)):null)??prior?.volumeVs5??null,
         structure,themes:themeEvidence,observed:r.observed,negativeStreak:r.negativeStreak,peakBoards:r.peakBoards,breakDate:r.breakDate};
       r.observations.push(obs);
       if(r.negativeStreak>=3){r.exitDate=date;r.exitEvidence=r.observations.slice(-3).map(o=>({date:o.date,pct:o.quote.pct}));}
@@ -102,7 +111,7 @@ export function crowdingSection(watch,date) {
   const day=watch.days[date],sources=new Set(),rows=[];
   const ordered=[...(day?.rows||[])].sort((a,b)=>Number(a.status==='今日退出')-Number(b.status==='今日退出')||b.id.split(':')[1].localeCompare(a.id.split(':')[1])||a.id.localeCompare(b.id));
   for(const row of ordered) {
-    const r=watch.records.find(r=>r.id===row.id),tail=r.observations.filter(o=>o.date<=date).slice(-5),q=row.quote;
+    const r=watch.records.find(r=>r.id===row.id),tail=[...(r.leadIn||[]),...r.observations].filter(o=>o.date<=date).slice(-5),q=row.quote;
     if(r.entrySource)sources.add(r.entrySource);
     for(const o of tail){if(o.quote.source)sources.add(o.quote.source);if(o.structure.source)sources.add(o.structure.source);}
     const s=row.structure;
@@ -118,7 +127,7 @@ export function crowdingSection(watch,date) {
     ]);
   }
   const history=watch.records.filter(r=>r.entryDate<=date).map(r=>({label:`${r.name} ${r.code} · ${r.entryDate}入池 · ${r.exitDate&&r.exitDate<=date?`${r.exitDate}退出`:'持续观察'}`,
-    lines:r.observations.filter(o=>o.date<=date).map(o=>`${o.date} | D${o.offset} | 涨幅${display(o.quote.pct)}% | ${display(o.quote.volume)}手 / ${billions(o.quote.amount)}亿 / 换手${display(o.quote.turnover)}% | 较前日${display(o.volumeVsPrevious)}倍 / 前5日均量${display(o.volumeVs5)}倍 | MA5 ${display(o.structure.ma5)} / MA10 ${display(o.structure.ma10)} | 连续负反馈${o.negativeStreak}/3`)}));
+    lines:[...(r.leadIn||[]),...r.observations].filter(o=>o.date<=date).map(o=>`${o.date} | D${o.offset}${o.offset<0?' 入池前参考':''} | 涨幅${display(o.quote.pct)}% | ${display(o.quote.volume)}手 / ${billions(o.quote.amount)}亿 / 换手${display(o.quote.turnover)}% | 较前日${display(o.volumeVsPrevious)}倍 / 前5日均量${display(o.volumeVs5)}倍 | MA5 ${display(o.structure.ma5)} / MA10 ${display(o.structure.ma10)}${o.offset>=0?` | 连续负反馈${o.negativeStreak}/3`:''}`)}));
   return {id:'crowding-watch',title:'抱团龙识别',history,columns:['标的 / 题材','入池与进度','连板 / 断板','连续量能轨迹','MA5 / MA10与承接','股价 / 市值','逐日反馈','结论 / 退出依据'],rows,
     note:`四连板及以上入池，D0后至少观察4个交易日，满4日仍继续；连续3日收盘涨幅严格小于-6%才退出（可提前触发）。缺测、停牌不拼接负反馈。当前记录起点 ${watch.originDate}，此前未取得的四板事件不宣称已覆盖。量能与涨幅显示最近5日，完整轨迹保存在同日数据包。市值/复权/风格解释未核齐时保留待核，不算确认龙头。`,
     sources:[...sources],status:!day?.poolComplete?'partial':rows.length?'partial':'complete'};

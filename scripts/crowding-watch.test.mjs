@@ -75,3 +75,10 @@ test('adjusted fallback verifies instrument and keeps provider series separate',
  assert.equal(parseTencentAdjusted(p,'sz000001','url').rows['2026-10-16'].low,8);
  assert.throws(()=>parseTencentAdjusted(p,'sz000002','url'));
 });
+test('pre-entry volume context is visible but cannot count as follow-up or trigger an exit',()=>{
+ const f=fixture([-7,-7,-7,10,1,2,3,4]);f.pools[sessions[0]].stocks=[];f.pools[sessions[3]].stocks=[stock];
+ const w=buildCrowdingWatch(f),r=w.records[0];assert.equal(r.leadIn.length,3);assert.equal(r.observations[0].observed,0);assert.equal(r.exitDate,null);
+ assert.match(crowdingSection(w,sessions[3]).history[0].lines[0],/入池前参考/);
+ const replay=buildCrowdingWatch({previous:w,sessions:sessions.slice(-2),pools:{},quotes:{},asOf:sessions.at(-1)});
+ assert.deepEqual(replay.records[0].leadIn,r.leadIn);
+});
