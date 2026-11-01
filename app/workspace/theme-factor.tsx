@@ -1,13 +1,15 @@
 import {useEffect,useRef} from 'react';
 import type {BaselineSection,ThemeFactor} from '../daily-baseline';
+import {describeThemeRhythm} from '../../scripts/theme-factor.mjs';
 import './theme-factor.css';
 const show=(v:number|null,suffix='')=>v===null?'待核':`${v}${suffix}`;
 function ThemeRow({item:t}:{item:ThemeFactor['items'][number]}){
  const track=useRef<HTMLDivElement>(null);
  const lastDate=t.points.at(-1)?.date;
+ const rhythm=describeThemeRhythm(t);
  useEffect(()=>{if(track.current)track.current.scrollLeft=track.current.scrollWidth-track.current.clientWidth},[lastDate]);
  return <article className="factor-theme">
-  <header><h4>{t.name}</h4><div className="factor-tags"><span className={t.high?'factor-high':''}>{t.rank?`第${t.rank}名`:(t.high===null?'排名待核':'未入来源前列')}</span>{t.rank!==null&&t.rank<=3&&<span>前三优先</span>}{t.firstHigh===true&&<strong>十日首次高强度</strong>}{t.dayNumber!==null&&<span>启动观察第{t.dayNumber}日</span>}{t.signals.map(s=><strong key={s}>{s}</strong>)}</div></header>
+  <header><div className="factor-identity"><h4>{t.name}</h4><div className="factor-tags"><span className={t.high?'factor-high':''}>{t.rank?`第${t.rank}名`:(t.high===null?'排名待核':'未入来源前列')}</span>{t.rank!==null&&t.rank<=3&&<span>前三优先</span>}{t.firstHigh===true&&<strong>十日首次高强度</strong>}{t.dayNumber!==null&&<span>启动观察第{t.dayNumber}日</span>}{t.high!==true&&rhythm.recentTop3.length>0&&<span className="factor-retained" title={rhythm.recentTop3.map(p=>`${p.date} 第${p.rank}名`).join('；')}>前3交易日曾进前三</span>}</div></div><div className={`factor-rhythm ${rhythm.tone}`} aria-label={`${t.name}当前节奏`}><strong>{rhythm.label}</strong><span>{rhythm.sequence}</span></div></header>
   <p className="factor-verdict">{t.next}</p>
   <div ref={track} className="factor-track" role="region" tabIndex={0} aria-label={`${t.name}题材与量能逐日对照`}>
    <div className="factor-lane factor-dates"><b>交易日</b>{t.points.map(p=><span key={p.date}>{p.date.slice(5)}</span>)}</div>
@@ -21,11 +23,11 @@ function ThemeRow({item:t}:{item:ThemeFactor['items'][number]}){
 export default function ThemeFactorModule({section}:{section:BaselineSection}){
  const f=section.factor;
  if(!f)return null;
- const active=f.items.filter(t=>t.high===true||t.firstHigh===true||(t.dayNumber!==null&&t.dayNumber<=3));
+ const active=f.items.filter(t=>t.high===true||t.firstHigh===true||(t.dayNumber!==null&&t.dayNumber<=3)||describeThemeRhythm(t).recentTop3.length>0);
  const others=f.items.filter(t=>!active.includes(t));
  return <details open id="leader-theme-factor" className="baseline-module theme-factor-module"><summary><span>龙头题材因子分析 <em>超重点</em></span><small className={section.status}>{section.status==='complete'?'已核验':'含待核项'}</small></summary><div className="baseline-module-body">
   <div className="factor-brief"><strong>{f.items.filter(t=>t.firstHigh===true).length} 个首次高强度</strong><span>{f.items.filter(t=>t.signals.length).length} 个持续性信号</span><span>排名覆盖 {f.rankCoverage}/10 日</span></div>
-  <p className="factor-rule">高强度＝当日前四，前三优先。十日首次可能启动；次日、第三日继续验证。</p>
+  <p className="factor-rule">高强度＝当日前四，前三优先。此前3个交易日进过前三的题材继续保留；“弱”仅指前四外，缺测显示待核。</p>
   <div className="factor-models"><span>分歧后回流 <b>强 → 弱 → 强</b></span><span>续强后回流 <b>强 → 强 → 弱 → 强</b></span><span>一直不弱 <b>连续保持前四</b></span></div>
   {active.map(t=><ThemeRow item={t} key={t.code}/>)}
   {!active.length&&<p className="factor-pending">当日无可确认的高强度信号，或数据尚待补齐。</p>}

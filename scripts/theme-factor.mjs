@@ -3,6 +3,22 @@ export const FACTOR_SOURCE='https://www.duanxianxia.com/web/platerotat';
 export const FACTOR_REFERENCE='https://travelstocks.github.io/MESSI-10-Trading-System/资料库%20-%20龙头周期复盘/index.html#patterns';
 const finite=Number.isFinite;
 const norm=s=>s.replace(/概念|产业链/g,'');
+export function describeThemeRhythm({points,firstHigh,streak,signals}){
+  const today=points.at(-1),previous=points.at(-2);
+  const recentTop3=points.slice(-4,-1).filter(p=>p.high===true&&p.rank!==null&&p.rank<=3).map(p=>({date:p.date,rank:p.rank}));
+  const tail=points.slice(-4),start=tail.findIndex(p=>p.high!==false);
+  const sequence=(firstHigh===true?[today]:tail.slice(Math.max(0,start))).map(p=>p.high===true?'强':p.high===false?'弱':'待核').join(' → ')||'待核';
+  let label='回落观察',tone='watch';
+  if(!today||today.high===null){label='数据待核';tone='pending'}
+  else if(firstHigh===true){label='启动观察';tone='start'}
+  else if(signals.includes('续强后回流')){label='续强后回流';tone='strong'}
+  else if(signals.includes('分歧后回流')){label='分歧后回流';tone='strong'}
+  else if(streak>=3){label=`一直不弱 · ${streak}日`;tone='strong'}
+  else if(streak===2){label='续强';tone='strong'}
+  else if(today.high===true){label=previous?.high===false?'回流候选':firstHigh===null?'首次待核':'当前高强度';tone='strong'}
+  else if(previous?.high===true){label='分歧候选'}
+  return {label,tone,sequence,recentTop3};
+}
 export function rankObservation(snapshot,code){
   const rows=snapshot?.rows||[];
   const valid=snapshot?.complete&&[1,2,3,4].every(n=>rows.some(r=>r.rank===n))&&new Set(rows.map(r=>r.code)).size===rows.length;
@@ -58,7 +74,7 @@ export function buildThemeFactor({date,sessions,ranks={},themes={},quotes={}}){
   const complete=window.length===10&&!missing.length&&items.every(t=>t.points.every(p=>p.limitUps!==null)&&t.leaders.length&&t.leaders.every(s=>s.points.slice(-3).every(p=>finite(p.amount))));
   const factor={date,provider,window,items,rankCoverage:window.length-missing.length,missing,reference:FACTOR_REFERENCE};
   return {id:'leader-theme-factor',title:'龙头题材因子分析',priority:'超重点',status:!items.length?'missing':complete?'complete':'partial',
-    columns:['题材','今日排名','首次高强度','持续性信号','次日核验'],rows:items.map(t=>[t.name,t.rank,t.firstHigh===true?'十日首次':t.firstHigh===null?'待核':'非首次',t.signals.join(' / ')||'观察中',t.next]),
+    columns:['题材','今日排名','首次高强度','当前节奏','次日核验'],rows:items.map(t=>{const rhythm=describeThemeRhythm(t);return [t.name,t.rank,t.firstHigh===true?'十日首次':t.firstHigh===null?'待核':'非首次',`${rhythm.label} / ${rhythm.sequence}`,t.next]}),
     note:'前四为高强度，前三优先。十日含当日，按真实交易日；未进前四只代表非高强度，不等于已确认分歧。排名结构是研究信号，龙头身份及量能共振仍须验证。',
     sources:[FACTOR_SOURCE,'https://www.duanxianxia.com/web/fupan',FACTOR_REFERENCE],factor};
 }
