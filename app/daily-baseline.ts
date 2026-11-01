@@ -1,6 +1,9 @@
 import {useEffect,useState} from 'react';
 import type {Point} from './recap-source';
-export type BaselineSection={id:string;title:string;columns:string[];rows:(string|number|null)[][];note:string;sources:string[];status:'complete'|'partial'|'missing';history?:{label:string;lines:string[]}[]};
+export type FactorPoint={date:string;rank:number|null;strength:number|null;high:boolean|null;limitUps:number|null};
+export type FactorLeader={code:string;name:string;role:string;selectedDate:string;selectedBoards:number;points:{date:string;amount:number|null;volume:number|null;turnover:number|null;pct:number|null;volumeRatio:number|null;source:string|null}[]};
+export type ThemeFactor={date:string;provider:string;window:string[];rankCoverage:number;missing:string[];reference:string;items:{code:string;name:string;rank:number|null;strength:number|null;high:boolean|null;firstHigh:boolean|null;startDate:string|null;dayNumber:number|null;streak:number;signals:string[];next:string;points:FactorPoint[];leaders:FactorLeader[]}[]};
+export type BaselineSection={id:string;title:string;columns:string[];rows:(string|number|null)[][];note:string;sources:string[];status:'complete'|'partial'|'missing';factor?:ThemeFactor;history?:{label:string;lines:string[]}[]};
 export type BaselineDay={date:string;previousDate:string;fetchedAt:string;status:string;metrics:Record<string,string>;topThemes:{name:string;code:string;rank:number;strength:number}[];strengthPoints:Point[];highest:{count:number|null;names:string[]};sections:BaselineSection[];gaps:{id:string;title:string;note:string}[]};
 export type Baseline={version:1;updatedAt:string;days:Record<string,BaselineDay>;sessions:string[]};
 let pending:Promise<Baseline>|undefined,loaded=0;

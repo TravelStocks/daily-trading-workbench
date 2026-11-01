@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {parseDxxPool,promotionDay} from './promotions.mjs';
 import {parseLimitUps} from './duanxianxia.mjs';
 import {buildCrowdingWatch,crowdingSection,parseAdjustedSeries,parseTencentAdjusted,parseSohuHistory} from './crowding-watch.mjs';
+import {buildThemeFactor} from './theme-factor.mjs';
 
 export const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
 export const plain=s=>String(s??'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
@@ -76,6 +77,23 @@ export function section(id,title,columns,rows,note,sources=[],status='complete')
  return {id,title,columns,rows,note,sources:[...new Set(sources.filter(Boolean))],status};
 }
 
+export async function collectFactorInputs({sessions,dates,saved={},rankings={},themes={},post,fetchedAt}){
+ const ranks={...saved.ranks},details={...saved.themes},errors=[];
+ const start=sessions.indexOf(dates[0]),end=sessions.indexOf(dates.at(-1));
+ for(const date of sessions.slice(Math.max(0,start-18),end+1)){
+  try{
+   const rows=rankings[date]||(!ranks[date]?.complete?parseStrength(await post('getPlateRotatData',{from:'kaipan',days:'1',dates:`${date} - ${date}`}),date):null);
+   if(rows)ranks[date]={date,provider:'duanxianxia',source:sourceRank,collectedAt:fetchedAt,complete:true,rows};
+  }catch(e){errors.push(`${date} rank: ${e.message}`)}
+  if(sessions.indexOf(date)<start-9)continue;
+  try{
+   if(themes[date])details[date]=themes[date];
+   else if(!details[date]){const c=await post('getFupanDate',{date,type:'choose'});if(c.date!==date)throw Error('日期回退');details[date]=parseThemeDetails(await post('getFupanByYidong',{date,type:'plate'}),date)}
+  }catch(e){errors.push(`${date} themes: ${e.message}`)}
+ }
+ return {ranks,themes:details,errors};
+}
+
 export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const fetchedAt=now.toISOString(),today=chinaDate(now),end=to||today;
  for(const d of [from,to].filter(Boolean))if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!Number.isFinite(Date.parse(d)))throw Error('日期须为 YYYY-MM-DD');
@@ -111,6 +129,8 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   await attempt(`${date} theme details`,async()=>{const c=await post('getFupanDate',{date,type:'choose'});if(c.date!==date)throw Error('日期回退');const p=await post('getFupanByYidong',{date,type:'plate'});themes[date]=parseThemeDetails(p,date);pools[date]=parseDxxPool(p,date)});
  });
  const themeNames=new Map(needed.flatMap(d=>(rankings[d]||[]).slice(0,5).map(r=>[r.code,r.name])));
+ const themeFactorInputs=await collectFactorInputs({sessions,dates,saved:old.themeFactorInputs,rankings,themes,post,fetchedAt});
+ errors.push(...themeFactorInputs.errors);
  await each([...themeNames],async ([code,name])=>attempt(`${name} four-session strength`,async()=>{
   const r=await post('getPlateDayChart',{platecode:code,days:'30',dates:`${needed[0]} - ${end}`});
   if(!Array.isArray(r.date)||r.date.length!==r.series1?.length||r.legend!==name)throw Error('强度历史身份不符');
@@ -253,6 +273,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   const foreign=context.quotes.map(q=>{const row=q.rows.filter(r=>r.date<=date).at(-1);return [q.name,row?.date||null,row?.close??null,row?.pct??null,q.region]});
   sections.push(section('overseas','已配置外围观察',['标的','实际交易日','收盘','日涨幅（%）','市场'],foreign,'美股当晚收盘作为次日盘前资料；早于目标日的行保留实际日期，不混为当日。',context.quotes.map(q=>q.source),foreign.every(r=>r[1]===date)?'complete':'partial'));
   sections.push(crowdingSection(crowdingWatch,date));
+  sections.splice(1,0,buildThemeFactor({date,sessions,ranks:themeFactorInputs.ranks,themes:themeFactorInputs.themes,quotes:{...savedQuotes.stocks,...bars}}));
   const topThemes=(rankings[date]||[]).slice(0,5),height=Math.max(0,...(pool?.stocks||[]).map(s=>s.boards));
   for(let si=0;si<sections.length;si++)sections[si]=keepVerifiedSection(old.days?.[date]?.sections?.find(s=>s.id===sections[si].id),sections[si]);
   for(const [key,value] of Object.entries(metrics))if(value==='待核'&&old.days?.[date]?.metrics?.[key])metrics[key]=old.days[date].metrics[key];
@@ -261,7 +282,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   console.log(`${date}: ${sections.filter(s=>s.status==='complete').length}/${sections.length} complete sections; ${topThemes.length} top themes`);
  }
  const trim=groups=>Object.fromEntries(Object.entries(groups).map(([key,rows])=>[key,Object.fromEntries(Object.entries(rows).filter(([d])=>d>=sessions[0]&&d<=today))]).filter(([,rows])=>Object.keys(rows).length));
- const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
+ const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,themeFactorInputs,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;
 }

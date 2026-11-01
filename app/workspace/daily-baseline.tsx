@@ -1,7 +1,9 @@
 import type {BaselineDay,BaselineSection} from '../daily-baseline';
 import './daily-baseline.css';
+import ThemeFactorModule from './theme-factor';
 const statusLabel={complete:'已采集',partial:'部分待核',missing:'暂缺来源'};
 function EvidenceTable({section:s}:{section:BaselineSection}){
+ if(s.id==='leader-theme-factor')return <ThemeFactorModule section={s}/>;
  return <details id={s.id==='crowding-watch'?'crowding-leader-watch':undefined} className={`baseline-module${s.id==='crowding-watch'?' baseline-crowding':''}`} open={['market','prior-themes','new-stocks','crowding-watch'].includes(s.id)}>
   <summary><span>{s.title}</span><small className={s.status}>{statusLabel[s.status]}</small></summary>
   <div className="baseline-module-body"><p>{s.note}</p>
