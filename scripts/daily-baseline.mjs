@@ -6,6 +6,10 @@ import {buildCrowdingWatch,crowdingSection,parseAdjustedSeries,parseTencentAdjus
 import {buildThemeFactor} from './theme-factor.mjs';
 
 export const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
+export function emotionValue(payload,date,key){
+ const i=payload?.dates?.[date];
+ return Number.isInteger(i)&&payload?.Aaxis?.[i]===date?number(payload.series?.[key]?.[i]):null;
+}
 export const plain=s=>String(s??'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
 const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 const fixed=n=>Number.isFinite(n)?Number(n.toFixed(2)):null;
@@ -114,10 +118,10 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const post=(path,body)=>get(`https://www.duanxianxia.com/api/${path}`,body);
  async function attempt(label,fn,fallback=null){try{return await fn()}catch(e){errors.push(`${label}: ${e.message}`);return fallback}}
  async function each(items,fn){for(let i=0;i<items.length;i+=4)await Promise.all(items.slice(i,i+4).map(fn))}
- const emotion=await post('getChartByQingxu',{});
+ const emotion=await attempt('emotion',()=>post('getChartByQingxu',{}),{});
  const calendarUrl='https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,90,qfq';
  const calendar=await get(calendarUrl),calendarBars=calendar.data?.sh000001?.day||calendar.data?.sh000001?.qfqday;
- if(!Array.isArray(calendarBars)||emotion.result!=='success')throw Error('真实交易日历或情绪日期缺失');
+ if(!Array.isArray(calendarBars))throw Error('真实交易日历缺失');
  const sessions=[...new Set(calendarBars.map(r=>r[0]).filter(d=>d<=end&&(d<today||new Date(now.getTime()+28800000).getUTCHours()>=16)))].sort();
  const start=from||sessions.at(-8),dates=sessions.filter(d=>d>=start),needed=sessions.slice(Math.max(0,sessions.indexOf(dates[0])-4));
  if(!dates.length)throw Error('所选区间没有已收盘交易日');
@@ -192,11 +196,13 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const days={...old.days};
  for(const date of dates){
   const previousDate=sessions[sessions.indexOf(date)-1],i=emotion.dates?.[date];
-  if(!Number.isInteger(i)||emotion.Aaxis?.[i]!==date){errors.push(`${date}: emotion date mismatch`);continue}
-  const ev=k=>number(emotion.series?.[k]?.[i]),pv=k=>number(emotion.series?.[k]?.[emotion.dates[previousDate]]);
+  if(!Number.isInteger(i)||emotion.Aaxis?.[i]!==date)errors.push(`${date}: emotion date mismatch; other dated observations retained`);
+  const ev=k=>emotionValue(emotion,date,k),pv=k=>emotionValue(emotion,previousDate,k);
   const risk=context.marketRiskDays?.[date],pool=pools[date],prior=pools[previousDate],sections=[],metrics={};
   for(const [name,data] of Object.entries(indices)){const r=data[date];metrics[name]=r?`${r.close} / ${r.pct>0?'+':''}${r.pct}%`:'待核'}
   metrics['成交额']=ev('HSLN')===null?'待核':`${ev('HSLN')} 亿元`;
+  const indexAmount=d=>[indices['沪指']?.[d]?.amount,indices['深指']?.[d]?.amount].every(Number.isFinite)?fixed((indices['沪指'][d].amount+indices['深指'][d].amount)/1e8):null;
+  if(ev('HSLN')===null&&indexAmount(date)!==null)metrics['成交额']=`${indexAmount(date)} 亿元（指数口径）`;
   metrics['涨跌家数']=`${ev('SZ')??'待核'}涨 / ${ev('XD')??'待核'}跌`;
   metrics['涨跌停']=`${ev('ZT')??'待核'}涨停 / ${ev('DT')??'待核'}跌停`;
   for(const [n,label] of [[1,'一板'],[2,'二板'],[3,'三板']])metrics[label]=pool?String(pool.stocks.filter(s=>s.boards===n).length):'待核';
@@ -204,6 +210,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   metrics['封板率']=ev('FB')===null?'待核':`${ev('FB')}%`;
   metrics['断板']=prior&&pool?`${prior.stocks.filter(s=>s.boards>=2&&!pool.stocks.some(t=>t.code===s.code)).length}家`:'待核';
   const marketRows=[['沪深成交额',ev('HSLN'),'亿元'],['较上日增减',ev('HSLN')!==null&&pv('HSLN')!==null?ev('HSLN')-pv('HSLN'):null,'亿元'],['上涨家数',ev('SZ'),'家'],['下跌家数',ev('XD'),'家'],['涨停家数',ev('ZT'),'家'],['跌停家数',ev('DT'),'家'],['封板率',ev('FB'),'%'],['昨日涨停表现',ev('ZTBX'),'%'],['昨日连板表现',ev('LBBX'),'%']];
+  if(ev('HSLN')===null&&indexAmount(date)!==null)marketRows.push(['沪深成交额（东方财富指数口径）',indexAmount(date),'亿元'],['指数口径较上日增减',indexAmount(previousDate)!==null?fixed(indexAmount(date)-indexAmount(previousDate)):null,'亿元']);
   sections.push(section('market','市场基础与连板溢价',['指标','数值','单位'],marketRows,'短线侠原指标；ZTBX/LBBX 为昨日样本今日表现，供应商权重未公开。不与东方财富池的不同统计口径混算。',[sourceDxx],marketRows.every(r=>r[1]!==null)?'complete':'partial'));
   sections.push(section('indices','四大指数',['指数','收盘','涨跌幅（%）','成交额（亿元）'],Object.entries(indices).map(([name,data])=>[name,data[date]?.close??null,data[date]?.pct??null,fixed((data[date]?.amount??NaN)/1e8)]),'东方财富同日未复权指数日线。',Object.values(indices).map(d=>d[date]?.source),Object.values(indices).every(d=>d[date])?'complete':'partial'));
   if(risk)sections.push(section('risk','涨跌停与炸板池',['统计','家数'],[['涨停',risk.limitUpCount],['跌停',risk.limitDownCount],['炸板',risk.brokenCount],['一字板',risk.oneWordCount]],'东方财富池口径，沪深样本；与上表短线侠家数分别保留。',Object.values(risk.sources)));
