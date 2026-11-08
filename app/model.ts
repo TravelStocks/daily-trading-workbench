@@ -1,4 +1,5 @@
 import raw from './exam.json';
+import {leaderFields} from './leader-plan';
 export type Block={id?:string;type:string;label?:string;long?:boolean;placeholder?:string;options?:string[];multi?:boolean;headers?:string[];rows?:string[][]};
 export const sections=raw as {title:string;blocks:Block[]}[];
 export type Answers=Record<string,string|string[]>;
@@ -14,6 +15,7 @@ export function personalPlan(p:Paper){
  return parts.length?parts.join('；')+'。':'';
 }
 export const fields=new Map<string,{label:string;options?:string[];multi?:boolean}>();
+for(const [key,label] of leaderFields)fields.set(key,{label:'龙头预案 · '+label});
 for(const s of sections)for(const b of s.blocks){
  if(b.type==='text'||b.type==='choice')fields.set(b.id!,{label:b.label!,options:b.options,multi:b.multi});
  if(b.type==='table')for(const [r,row]of b.rows!.entries()){

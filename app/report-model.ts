@@ -1,4 +1,5 @@
 import {fields,personalPlan,type Paper} from './model';
+import {leaderFields} from './leader-plan';
 import {topFive,type Archive, type SourceSection} from './recap-source';
 import {candidateRows as activeCandidateRows,nextDayFields} from './required-candidates';
 import {requiredDailyReviews,entryOnly} from './required-reviews';
@@ -33,6 +34,8 @@ export function buildReport(date:string,p:Paper,archive:Archive):DailyReport{
   {title:'十三、龙头预备票',summary:join([a('f99')&&'综合量价最有资格：'+a('f99'),a('f70')&&'最主动：'+a('f70'),a('f71')&&'最抗跌：'+a('f71'),a('f72')&&'回流最快：'+a('f72'),a('f73')&&'最能带动板块：'+a('f73')]),facts:[...(!candidates.length&&a('f189')?[['今日无候选的核验说明',a('f189')] as [string,string]]:[]),...facts(['f104_2_rating','f68','f69','f93','f94','f95','f96','f97','f98'])],table:qualityRows.length?{headers:['标的','身位','主动性','领涨性','抗跌性','市场性','价值性','第一性','唯一性','五维结论','100%异动监管距离','题材梯队完整性','题材持续性','筹码结构 / 量能备注'],rows:qualityRows}:undefined,source:source(/龙头预备票/)}
  ];
  // Keep source-only chapters (oral notes, operation plans, etc.) in the complete report.
+ const leaderPlan=facts([...leaderFields.keys()].filter(k=>k!=='lpOpportunity'||a('lpLeader')==='不是'));
+ if(leaderPlan.length)raw.push({title:'龙头预案',summary:'',facts:leaderPlan});
  const usedSources=new Set(raw.map(s=>s.source?.title).filter(Boolean));
  for(const extra of sourceDay?.sections||[])if(!usedSources.has(extra.title))raw.push({title:extra.title,summary:'',facts:[],source:extra});
  const sections=raw.map(s=>({...s,summary:s.summary==='。'?'':s.summary,missing:(!s.summary||s.summary==='。')&&!s.facts.length&&!s.table?.rows.length&&!s.source?.text}));
