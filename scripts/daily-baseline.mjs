@@ -290,6 +290,8 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  }
  const trim=groups=>Object.fromEntries(Object.entries(groups).map(([key,rows])=>[key,Object.fromEntries(Object.entries(rows).filter(([d])=>d>=sessions[0]&&d<=today))]).filter(([,rows])=>Object.keys(rows).length));
  const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,themeFactorInputs,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
+ restoreDatedEvidence(result,context);
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;
 }
+import {restoreDatedEvidence} from './restore-dated-evidence.mjs';
