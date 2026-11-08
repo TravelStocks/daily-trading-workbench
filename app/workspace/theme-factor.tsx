@@ -25,8 +25,18 @@ export default function ThemeFactorModule({section}:{section:BaselineSection}){
  if(!f)return null;
  const active=f.items.filter(t=>t.high===true||t.firstHigh===true||(t.dayNumber!==null&&t.dayNumber<=3)||describeThemeRhythm(t).recentTop3.length>0);
  const others=f.items.filter(t=>!active.includes(t));
+ const rankedDate=f.window.slice().reverse().find(d=>f.items.some(t=>t.points.some(p=>p.date===d&&p.high===true)));
+ const current=rankedDate===f.date;
+ const ranked=f.items.flatMap(t=>{
+  const p=t.points.find(p=>p.date===rankedDate&&p.high===true);
+  return p&&p.rank!=null?[{t,p,rank:p.rank}]:[];
+ }).sort((a,b)=>a.rank-b.rank);
  return <details open id="leader-theme-factor" className="baseline-module theme-factor-module"><summary><span>龙头题材因子分析 <em>超重点</em></span><small className={section.status}>{section.status==='complete'?'已核验':'含待核项'}</small></summary><div className="baseline-module-body">
-  <div className="factor-brief"><strong>{f.items.filter(t=>t.firstHigh===true).length} 个首次高强度</strong><span>{f.items.filter(t=>t.signals.length).length} 个持续性信号</span><span>排名覆盖 {f.rankCoverage}/10 日</span></div>
+  <div className="factor-brief"><strong>{current?f.date+' 当日前四':f.date+' 缺少当日题材排名'}</strong>{current?<span>{f.items.filter(t=>t.firstHigh===true).length} 个首次高强度 · {f.items.filter(t=>t.signals.length).length} 个持续性信号</span>:<span>不能判定当日启动、分歧或回流</span>}<span>排名覆盖 {f.rankCoverage}/{f.window.length} 日</span></div>
+  {ranked.length>0&&<div className="baseline-table-scroll"><table aria-label="题材因子速览"><caption>{current?'当日题材与量能':rankedDate+' 最近有排名的交易日（非当日排名）'}</caption><thead><tr>{['排名','题材','强度','涨停数',current?'持续性节奏':'跟踪原因',f.date+' 观察样本成交额'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{ranked.map(({t,p,rank})=>{
+   const samples=t.leaders.flatMap(l=>{const q=l.points.find(v=>v.date===f.date);return q?.amount!=null?[{name:l.name,amount:q.amount}]:[]}).sort((a,b)=>b.amount-a.amount);
+   return <tr key={t.code}><td>{rank}</td><td>{t.name}</td><td>{p.strength??'—'}</td><td>{p.limitUps??'未取得分类'}</td><td>{current?describeThemeRhythm(t).label:rankedDate+' 前四'}</td><td>{samples.length?samples.slice(0,2).map(s=>s.name+' '+(s.amount/1e8).toFixed(2)+'亿').join(' / '):'无匹配量能样本'}</td></tr>
+  })}</tbody></table></div>}
   <p className="factor-rule">高强度＝当日前四，前三优先。此前3个交易日进过前三的题材继续保留；“弱”仅指前四外，缺测显示待核。</p>
   <div className="factor-models"><span>分歧后回流 <b>强 → 弱 → 强</b></span><span>续强后回流 <b>强 → 强 → 弱 → 强</b></span><span>一直不弱 <b>连续保持前四</b></span></div>
   {active.map(t=><ThemeRow item={t} key={t.code}/>)}
