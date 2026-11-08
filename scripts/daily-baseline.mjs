@@ -86,7 +86,7 @@ export async function collectFactorInputs({sessions,dates,saved={},rankings={},t
  const start=sessions.indexOf(dates[0]),end=sessions.indexOf(dates.at(-1));
  for(const date of sessions.slice(Math.max(0,start-18),end+1)){
   try{
-   const rows=rankings[date]||(!ranks[date]?.complete?parseStrength(await post('getPlateRotatData',{from:'kaipan',days:'1',dates:`${date} - ${date}`}),date):null);
+   const rows=rankings[date]||((dates.includes(date)||!ranks[date]?.complete)?parseStrength(await post('getPlateRotatData',{from:'kaipan',days:'1',dates:`${date} - ${date}`}),date):null);
    if(rows)ranks[date]={date,provider:'duanxianxia',source:sourceRank,collectedAt:fetchedAt,complete:true,rows};
   }catch(e){errors.push(`${date} rank: ${e.message}`)}
   if(sessions.indexOf(date)<start-9)continue;
@@ -115,7 +115,7 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
   for(let n=0;n<2;n++){try{const r=await fetch(url,{method:body?'POST':'GET',body:body?new URLSearchParams(body):undefined,headers:{'User-Agent':'Mozilla/5.0'},signal:AbortSignal.timeout(14000)});if(!r.ok)throw Error(`HTTP ${r.status}`);const data=await r.json();if(cache){await fs.mkdir(cacheDir,{recursive:true});await fs.writeFile(cache,JSON.stringify({url,body,fetchedAt,data}))}return data}catch(e){failure=e}}
   throw failure;
  }
- const post=(path,body)=>get(`https://www.duanxianxia.com/api/${path}`,body);
+ const post=(path,body)=>get(`https://v.duanxianxia.com/api/${path}`,body);
  async function attempt(label,fn,fallback=null){try{return await fn()}catch(e){errors.push(`${label}: ${e.message}`);return fallback}}
  async function each(items,fn){for(let i=0;i<items.length;i+=4)await Promise.all(items.slice(i,i+4).map(fn))}
  const emotion=await attempt('emotion',()=>post('getChartByQingxu',{}),{});

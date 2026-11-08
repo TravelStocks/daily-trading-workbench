@@ -13,10 +13,10 @@ export function parseLimitUps(payload,date){
   return {name,count:+count,stocks:unique};
  });
  if(!groups.length||new Set(groups.map(g=>g.name)).size!==groups.length)throw Error('短线侠分类缺失或重复');
- return {date,provider:'短线侠 · 按概念涨停复盘',source:'https://www.duanxianxia.com/web/fupan',endpoint:'https://www.duanxianxia.com/api/getFupanByYidong',groups};
+ return {date,provider:'短线侠 · 按概念涨停复盘',source:'https://www.duanxianxia.com/web/fupan',endpoint:'https://v.duanxianxia.com/api/getFupanByYidong',groups};
 }
 export async function fetchLimitUps(date,fetcher=fetch){
- async function post(path,body){const r=await fetcher(`https://www.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams(body),signal:AbortSignal.timeout(18000)});if(!r.ok)throw Error(`短线侠 HTTP ${r.status}`);return r.json()}
+ async function post(path,body){const r=await fetcher(`https://v.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams(body),signal:AbortSignal.timeout(18000)});if(!r.ok)throw Error(`短线侠 HTTP ${r.status}`);return r.json()}
  const calendar=await post('getFupanDate',{date,type:'choose'});
  if(calendar.result!=='success'||calendar.date!==date)throw Error(`短线侠尚无 ${date} 复盘`);
  return parseLimitUps(await post('getFupanByYidong',{date,type:'plate'}),date);

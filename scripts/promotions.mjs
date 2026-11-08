@@ -57,7 +57,7 @@ export async function collectPromotions(old={}, now=new Date(), fetcher=fetch) {
     if(pools[date]?.complete&&!refresh.has(date))continue;
     const source=`https://push2ex.eastmoney.com/getTopicZTPool?ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt&Pageindex=0&pagesize=1000&sort=fbt%3Aasc&date=${date.replaceAll('-','')}`;
     try{
-      const post=async(path)=>{const r=await fetcher(`https://www.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams({date,type:path==='getFupanDate'?'choose':'plate'}),signal:AbortSignal.timeout(18000)});if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();};
+      const post=async(path)=>{const r=await fetcher(`https://v.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams({date,type:path==='getFupanDate'?'choose':'plate'}),signal:AbortSignal.timeout(18000)});if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();};
       const calendar=await post('getFupanDate');if(calendar.result!=='success'||calendar.date!==date)throw Error('短线侠日期不符');
       pools[date]={...parseDxxPool(await post('getFupanByYidong'),date),updatedAt:now.toISOString()};
     }catch(e){

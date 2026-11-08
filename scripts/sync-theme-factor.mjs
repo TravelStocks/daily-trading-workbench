@@ -8,12 +8,18 @@ const dates=Object.keys(data.days).filter(d=>d>=arg('--from')&&d<=arg('--to')).s
 if(!dates.length)throw Error('No existing completed dates selected');
 const now=new Date().toISOString();
 const post=async(path,body)=>{
- const r=await fetch(`https://www.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams(body),signal:AbortSignal.timeout(15000)});
+ const r=await fetch(`https://v.duanxianxia.com/api/${path}`,{method:'POST',body:new URLSearchParams(body),signal:AbortSignal.timeout(15000)});
  if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();
 };
 const inputs=await collectFactorInputs({sessions:data.sessions,dates,saved:data.themeFactorInputs,post,fetchedAt:now});
 for(const date of dates){
  const day=data.days[date],section=buildThemeFactor({date,sessions:data.sessions,ranks:inputs.ranks,themes:inputs.themes,quotes:data.quoteCache?.stocks});
+ const snapshot=inputs.ranks[date];
+ if(snapshot?.complete){
+  day.topThemes=snapshot.rows.slice(0,5);
+  const window=data.sessions.slice(0,data.sessions.indexOf(date)+1).slice(-4);
+  day.strengthPoints=window.flatMap(d=>(inputs.ranks[d]?.rows||[]).filter(row=>day.topThemes.some(t=>t.code===row.code)).map(row=>({...row,date:d,state:'',raw:String(row.strength),sourceDate:d,url:inputs.ranks[d].source})));
+ }
  day.sections=day.sections.filter(s=>s.id!==section.id);day.sections.splice(1,0,section);
  day.gaps=day.sections.filter(s=>s.status!=='complete').map(s=>({id:s.id,title:s.title,status:s.status,note:s.note}));
  day.status=day.gaps.length?'partial':'complete';
