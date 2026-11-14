@@ -6,7 +6,12 @@ function CardText({card}:{card:Card}){const at=card.emphasis?card.text.indexOf(c
 function Heading({title,note}:{title:string;note?:string}){return <header className="handbook-heading"><div><h2>{title}</h2>{note&&<p>{note}</p>}</div></header>}
 export default function TradingHandbook(){return <div id="handbook" className="trading-handbook">
  <div className="handbook-intro"><div><span className="section-kicker">长期保留 · 盘前复读</span><h2>交易手册与常用工具</h2><p>沿用原复盘站的个人交易框架；与每日市场数据分开标注。</p></div><a href={handbook.source} target="_blank" rel="noreferrer">原站资料 ↗</a></div>
- <nav className="handbook-nav" aria-label="交易手册目录">{[['cycle-map','情绪周期图'],['system-profile','体系优缺点'],['expectations','隔日预期'],['knowledge','日常知识'],['theme-rhythm','题材节奏'],['research','专题研究'],['calculators','风控计算器']].map(([id,label])=><a key={id} href={'#'+id}>{label}</a>)}</nav>
+ <nav className="handbook-nav" aria-label="交易手册目录">{[['priority-rules','三件要改的事'],['cycle-map','情绪周期图'],['system-profile','体系优缺点'],['expectations','隔日预期'],['knowledge','日常知识'],['theme-rhythm','题材节奏'],['research','专题研究'],['calculators','风控计算器']].map(([id,label])=><a key={id} href={'#'+id}>{label}</a>)}</nav>
+ <section id="priority-rules" className="handbook-panel handbook-priority"><Heading title="三件要改的事" note="盘前复读 · 个人交易纪律"/><ol>
+ <li><h3>切换默认不做，试错最多半成仓</h3><p>这笔是原抱团仓加仓，还是换了方向？若是切换，默认放弃；确需试错，最多用账户的5%。半成仓是上限，不是出手理由。</p></li>
+ <li><h3>没定龙别抢，定龙后回封别慢</h3><p>同身位PK有结果了吗？未定龙不抢。已定龙，且题材、量能和分歧回流符合预案，才看回封盘口：连续进攻大单达到上方剩余压单的1/4是准备，进攻压过抛压才执行。</p></li>
+ <li><h3>龙二波提前筛，首次突破才是买点</h3><p>今天看到的是首次主动突破，还是涨远了才敢信？每天筛曾走出三连板及以上的标的和走过一波的趋势龙，标前高、平台上沿，观察主动反包。突破新高看买点，不再创新高看卖点；错过不补追。抱团单只约一成，同时管住总仓位。</p></li>
+ </ol><a href="https://travelstocks.github.io/weekly-monthly-quarterly-yearly-trading-review/2026-11-09_2026-11-13/#priority-rules">回看11月9日至13日的周复盘</a></section>
  <section id="cycle-map" className="handbook-panel">
   <Heading title={handbook.cycle.title} note={handbook.cycle.note}/>
   <div className="cycle-map-gallery">
