@@ -8,7 +8,19 @@ export type BaselineDay={date:string;previousDate:string;fetchedAt:string;status
 export type Baseline={version:1;updatedAt:string;days:Record<string,BaselineDay>;sessions:string[]};
 let pending:Promise<Baseline>|undefined,loaded=0;
 export function readBaseline(){
- if(!pending||Date.now()-loaded>110000){loaded=Date.now();pending=fetch(`${import.meta.env.BASE_URL}data/daily-baseline.json`,{cache:'no-cache',signal:AbortSignal.timeout(15000)}).then(async r=>{if(!r.ok)throw Error('数据未就绪');const j=await r.json();if(j.version!==1||!j.days)throw Error('数据格式不符');return j as Baseline}).catch(e=>{pending=undefined;throw e})}
+ if(!pending||Date.now()-loaded>110000){
+  loaded=Date.now();
+  const local=`${import.meta.env.BASE_URL}data/daily-baseline.json`;
+  // Scheduled data commits can precede the next Pages deployment.
+  const urls=location.hostname==='travelstocks.github.io'?['https://raw.githubusercontent.com/TravelStocks/daily-trading-workbench/main/public/data/daily-baseline.json',local]:[local];
+  pending=(async()=>{for(const url of urls){try{
+   const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.timeout(15000)});
+   if(!r.ok)continue;
+   const j=await r.json();if(j.version===1&&j.days)return j as Baseline;
+  }catch{/* Try the published snapshot when the live archive is unavailable. */}}
+  throw Error('收盘数据暂不可用');
+  })().catch(e=>{pending=undefined;throw e});
+ }
  return pending;
 }
 export function useBaseline(){
