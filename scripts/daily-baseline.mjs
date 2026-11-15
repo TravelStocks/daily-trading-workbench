@@ -4,6 +4,7 @@ import {parseDxxPool,promotionDay} from './promotions.mjs';
 import {parseLimitUps} from './duanxianxia.mjs';
 import {buildCrowdingWatch,crowdingSection,parseAdjustedSeries,parseTencentAdjusted,parseSohuHistory} from './crowding-watch.mjs';
 import {buildThemeFactor} from './theme-factor.mjs';
+import {attachWave} from './second-wave.mjs';
 
 export const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
 export function emotionValue(payload,date,key){
@@ -165,6 +166,8 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const ipo=await attempt('new stocks',async()=>{const j=await get(ipoSource);if(!j.success||j.result?.pages>1)throw Error('新股来源不完整');return (j.result?.data||[]).filter(s=>/^[036]\d{5}$/.test(s.SECURITY_CODE)).map(s=>({code:s.SECURITY_CODE,name:s.SECURITY_NAME,listingDate:s.LISTING_DATE.slice(0,10),issuePrice:number(s.ISSUE_PRICE)}))});
  const universe=new Map(needed.flatMap(d=>[...(pools[d]?.stocks||[]),...(context.marketRiskDays?.[d]?.brokenStocks||[]),...(context.marketRiskDays?.[d]?.breakCohort||[]) ]).concat(ipo||[]).map(s=>[s.code,s]));
  const watchPools={...old.crowdingWatch?.pools,...pools};
+ for(const r of Object.values(old.secondWave?.[sessions[sessions.indexOf(dates[0])-1]]?.pool||{}))universe.set(r.code,r);
+ for(const r of Object.values(old.secondWave?.[dates.at(-1)]?.pool||{}))universe.set(r.code,r);
  for(const [d,p] of Object.entries(watchPools).sort(([a],[b])=>a.localeCompare(b)))if(d<=end&&p?.complete)for(const s of p.stocks)if(s.boards>=4&&!watchCodes.has(s.code))watchCodes.set(s.code,{...s,entryDate:d});
  for(const r of old.crowdingWatch?.records||[])if(r.entryDate<=end&&!watchCodes.has(r.code))watchCodes.set(r.code,r);
  for(const [code,s] of watchCodes)universe.set(code,s);
@@ -291,6 +294,8 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const trim=groups=>Object.fromEntries(Object.entries(groups).map(([key,rows])=>[key,Object.fromEntries(Object.entries(rows).filter(([d])=>d>=sessions[0]&&d<=today))]).filter(([,rows])=>Object.keys(rows).length));
  const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,themeFactorInputs,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
  restoreDatedEvidence(result,context);
+ result.secondWave=old.secondWave||{};
+ attachWave(result,{from:dates[0],end:dates.at(-1)});
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;
 }

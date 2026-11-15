@@ -26,6 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node --test scripts/second-wave.test.mjs
       - name: Capture final auction when on time
         if: github.event.schedule == '27 1 * * 1-5'
         run: node scripts/capture-auction.mjs

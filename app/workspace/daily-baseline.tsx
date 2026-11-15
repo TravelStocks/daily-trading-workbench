@@ -2,9 +2,9 @@ import type {BaselineDay,BaselineSection} from '../daily-baseline';
 import './daily-baseline.css';
 import ThemeFactorModule from './theme-factor';
 const statusLabel={complete:'已采集',partial:'已收录部分数据',missing:'暂缺来源'};
-function EvidenceTable({section:s}:{section:BaselineSection}){
+export function EvidenceTable({section:s}:{section:BaselineSection}){
  if(s.id==='leader-theme-factor')return <ThemeFactorModule section={s}/>;
- return <details id={s.id==='crowding-watch'?'crowding-leader-watch':undefined} className={`baseline-module${s.id==='crowding-watch'?' baseline-crowding':''}`} open={['market','prior-themes','new-stocks','crowding-watch'].includes(s.id)}>
+ return <details id={s.id==='crowding-watch'?'crowding-leader-watch':undefined} className={`baseline-module${s.id==='crowding-watch'?' baseline-crowding':''}`} open={['market','prior-themes','new-stocks','crowding-watch','second-wave-watch'].includes(s.id)}>
   <summary><span>{s.title}</span><small className={s.status}>{statusLabel[s.status]}</small></summary>
   <div className="baseline-module-body"><p>{s.note}</p>
    {s.rows.length>0?<div className="baseline-table-scroll" tabIndex={0} role="region" aria-label={s.title}><table><thead><tr>{s.columns.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{s.rows.map((row,i)=><tr key={i}>{row.map((cell,j)=><td key={j}>{cell===null||cell==='待核'||cell==='待核实'?'—':typeof cell==='string'&&/^https:\/\//.test(cell)?<a href={cell} target="_blank" rel="noreferrer">核对原文</a>:cell}</td>)}</tr>)}</tbody></table></div>:<p className="baseline-empty">{s.status==='complete'?'当日无符合范围的记录。':'缺失数据没有按零填入，也没有套用其他日期。'}</p>}
