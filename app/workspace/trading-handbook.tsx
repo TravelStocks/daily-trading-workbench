@@ -15,7 +15,8 @@ export default function TradingHandbook(){return <div id="handbook" className="t
  </ol><a href="https://travelstocks.github.io/weekly-monthly-quarterly-yearly-trading-review/2026-11-09_2026-11-13/#priority-rules">回看11月9日至13日的周复盘</a></section>
  <section id="leader-modes" className="handbook-panel"><Heading title="我的主模式：龙头" note="盘前按以下顺序筛选；都不符合，可以空仓。"/><ol>
  <li><h3>连板主升二阶段的唯一性龙头</h3><p>题材是否处于连板主升二阶段？分歧回流时，同身位竞争是否已经分出胜负？没有定龙，就不预押赢家。</p></li>
- <li><h3>题材主升二波的龙头二波</h3><p>是题材整体再起，还是只有老龙反弹？平台突破和断板反包都可以观察；只有题材重新走主升、原龙头仍是主动核心，才归入这一类。</p></li>
+ <li><h3>题材主升二波的龙头二波</h3><p>是题材整体再起，还是只有老龙反弹？平台突破和断板反包都可以观察；只有题材重新走主升、原龙头仍是主动核心，才归入这一类。</p>
+ <p id="second-wave-exit"><strong>卖点：首板加速，分批退出。</strong>如果二波的第一个涨停就是加速一字板，可以开始减仓，首笔比例不固定。后续交易日，盘中相对昨收涨幅超过 6% 时，按这笔交易最初持仓数量的 50% 减仓，不是卖掉剩余仓位的一半。分批减至清仓；余仓不足这一份时，只卖余仓。</p></li>
  <li><h3>抱团龙</h3><p>如果走强的是跨题材高标，而不是原题材整体回流，就看它是否是抱团中主动走强、分歧时仍有承接的核心。被别人带起来的后排不算。</p></li>
  </ol></section>
  <section id="market-anchor" className="handbook-panel"><Heading title="市场情绪锚：看跨题材高标怎么回应"/><p>盘前选出代表旧周期的高标。开盘记锚先动的时点，再看其他题材高标跟不跟、第一次分歧时有没有承接。锚跌停而其他高标陆续深水，是负反馈扩散；锚转强、别的高标接力且回落有人承接，是抱团相互支撑。只有一只异动，不用它替整个市场下结论。</p><p>有些高标已不只按本题材定价。分仓到不同板块，也可能是在承担同一轮高标情绪风险。<a href="https://travelstocks.github.io/weekly-monthly-quarterly-yearly-trading-review/2026-11-09_2026-11-13/#market-anchor">11月13日新华传媒案例</a></p></section>
