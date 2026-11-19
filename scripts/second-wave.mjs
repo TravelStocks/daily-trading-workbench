@@ -48,7 +48,21 @@ export function attachWave(base,{from=start,end=base.sessions.at(-1)}={}){
   // At the rolling calendar boundary the existing snapshot is the checkpoint.
   if(date!==start&&!snapshots[prev]&&snapshots[date])continue;
   const checkpoint=snapshots[prev]||snapshots[Object.keys(snapshots).filter(d=>d<date).sort().at(-1)];
-  const s=waveDay({date,prev,prior:pools[prev],current:pools[date],quotes,last:checkpoint});
+  const saved=snapshots[date],retained=[],inherited={...(checkpoint?.pool||{})};
+  const comparable=complete(pools[prev])&&complete(pools[date])&&pools[prev].scopeKey===pools[date].scopeKey;
+  // Replaying a source outage must not erase an already verified admission.
+  for(const code of saved?.added||[]){
+   const r=saved.pool?.[code],q=quotes[code]?.[date];
+   if(r?.entry===date&&(!comparable||!positive(q?.close)||!positive(q?.volume))){
+    inherited[code]={...r,window:[],bounds:null};retained.push(code);
+   }
+  }
+  const s=waveDay({date,prev,prior:pools[prev],current:pools[date],quotes,last:{...checkpoint,pool:inherited}});
+  if(retained.length){
+   s.added=[...new Set([...s.added,...retained.filter(code=>s.pool[code])])];
+   s.sources=[...new Set([...s.sources,...saved.sources||[]])];
+   s.missing.push('本次证据不完整，保留此前已核实入池：'+retained.map(code=>inherited[code].name).join('、'));
+  }
   if(date!==start&&!snapshots[prev])s.missing.push('上个交易日名单未衔接');
   snapshots[date]=s;
   const row=(r,action)=>[r.name+' '+r.code,r.height,r.entry,action,r.close,r.bounds?`${r.bounds.low}–${r.bounds.high}（${r.bounds.from} 至 ${r.bounds.to}）`:'尚无可核平台',r.status,r.reversal];
