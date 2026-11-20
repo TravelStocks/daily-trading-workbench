@@ -2,7 +2,7 @@
 export const FACTOR_SOURCE='https://www.duanxianxia.com/web/platerotat';
 export const FACTOR_REFERENCE='https://travelstocks.github.io/MESSI-10-Trading-System/资料库%20-%20龙头周期复盘/index.html#patterns';
 const finite=Number.isFinite;
-const norm=s=>s.replace(/概念|产业链/g,'');
+const norm=s=>s.replace(/概念|产业链/g,'').replace(/^半导体$/,'芯片');
 export function describeThemeRhythm({points,firstHigh,streak,signals}){
   const today=points.at(-1),previous=points.at(-2);
   const recentTop3=points.slice(-4,-1).filter(p=>p.high===true&&p.rank!==null&&p.rank<=3).map(p=>({date:p.date,rank:p.rank}));

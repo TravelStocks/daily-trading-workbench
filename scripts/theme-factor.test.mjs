@@ -16,6 +16,21 @@ test('real session order, not calendar arithmetic',()=>{const days=['2026-10-09'
 test('previous highest samples retained after failure; absent quotes not zero',()=>{const r=setup([true,false,true]),date=sessions.at(-3);const t=item(r,{themes:{[date]:[{name:'测试',stocks:[{code:'a',name:'老高标',boards:4}]}]}});assert.equal(t.leaders[0].code,'a');assert.equal(t.leaders[0].points.at(-1).amount,null);assert.equal(t.points.at(-1).limitUps,null)});
 test('incomplete top four does not certify strength',()=>{const s=snapshot(2);s.rows=s.rows.filter(r=>r.rank!==4);assert.equal(rankObservation(s,'t').high,null)});
 
+test('chip ranking matches semiconductor composite groups without merging narrower industries',()=>{
+ const ranks=setup([true,true]);
+ for(const r of Object.values(ranks))for(const row of r.rows)if(row.code==='t')row.name='芯片';
+ const previous=sessions.at(-2),date=sessions.at(-1);
+ const themes={
+  [previous]:[{name:'算力/半导体产业链',stocks:[{code:'old',name:'昨日高标',boards:4}]}],
+  [date]:[{name:'算力/半导体产业链',stocks:[{code:'a',name:'高标甲',boards:4},{code:'b',name:'高标乙',boards:4},{code:'c',name:'首板',boards:1}]},
+          {name:'半导体设备',stocks:[{code:'other',name:'不合并子行业',boards:6}]}]
+ };
+ const before=JSON.stringify(themes),t=item(ranks,{themes});
+ assert.deepEqual(t.leaders.map(s=>s.code),['old','a','b']);
+ assert.equal(t.points.at(-1).limitUps,3);
+ assert.equal(JSON.stringify(themes),before);
+});
+
 test('first high shows startup, second high continuation, long streak remains strong',()=>{
  assert.equal(describeThemeRhythm(item(setup([true]))).label,'启动观察');
  assert.equal(describeThemeRhythm(item(setup([true]))).sequence,'强');
