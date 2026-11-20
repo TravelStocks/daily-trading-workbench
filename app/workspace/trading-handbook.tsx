@@ -9,7 +9,7 @@ export default function TradingHandbook(){return <div id="handbook" className="t
  <div className="handbook-intro"><div><span className="section-kicker">长期保留 · 盘前复读</span><h2>交易手册与常用工具</h2><p>沿用原复盘站的个人交易框架；与每日市场数据分开标注。</p></div><a href={handbook.source} target="_blank" rel="noreferrer">原站资料 ↗</a></div>
  <nav className="handbook-nav" aria-label="交易手册目录">{[['daily-preflight','每日盘前三问'],['weekly-loss-stop','周亏5%停止开仓'],['priority-rules','三件要改的事'],['leader-modes','龙头模式优先级'],['market-anchor','市场情绪锚'],['second-wave-pool','龙二波观察池'],['cycle-map','情绪周期图'],['system-profile','体系优缺点'],['expectations','隔日预期'],['knowledge','日常知识'],['theme-rhythm','题材节奏'],['research','专题研究'],['calculators','风控计算器']].map(([id,label])=><a key={id} href={'#'+id}>{label}</a>)}</nav>
  <section id="daily-preflight" className="handbook-panel handbook-priority"><Heading title="每日盘前三问" note="每次做盘前预案，先检查，再讨论个股"/><ol>
- <li><h3>本周累计亏损有没有达到5%？</h3><p>按本周期初权益核对，包含已实现与浮动盈亏，不按周内高点回撤。达到5%，本周停止开新仓；看好龙头、题材或买点也不例外。</p></li>
+ <li><h3>本周累计亏损有没有达到5%？</h3><p data-weekly-risk-rule>按周初权益计算整周收益，包含已实现和浮动盈亏，不按周内高点回撤。无出入金时，周收益率 =（当前权益 / 周初权益 - 1）× 100%；有出入金先单独核对，数据未确认标待核。本周任一时点周收益率 ≤ -5%（恰好亏5%也算）即触线：本周剩余时间停止开新仓，新增开仓预算统一为0。空仓、换票、亏损收窄、看好龙头或小仓试错均不能解除。进入新周重新核对周初权益与三问，不自动放行；已有持仓继续按原退出计划管理。</p></li>
  <li><h3>我是不是急着回本，才想买得更早、更重？</h3><p>如果这周没有亏损，我还会在这个位置、用这个仓位买它吗？不因回本冲动放宽买点、仓位和筛选要求；心态由本人确认，不凭亏损猜测。</p></li>
  <li><h3>天时和题材，是否支持这个买点及仓位？</h3><p>核对当前回流、主动转强与承接，不只看启动强度和龙头身份。未触及周亏停开仓时，弱天时只考虑三成及以下的右侧确认，更严限仓优先。</p></li>
  </ol><p><strong>第一问触线，后两问不能推翻停止开仓。</strong>当天预案先记录三问的结论、依据与待核项，再列交易计划；触线后新增开仓预算为0，只保留观察和已有持仓处理。空仓、换票或后续回升不能自行解除本周停止开仓。数据不全标待核，不默认通过；账户数值与心态答案不自动公开。</p></section>
