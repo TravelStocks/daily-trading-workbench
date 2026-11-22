@@ -4,7 +4,7 @@ import ThemeFactorModule from './theme-factor';
 const statusLabel={complete:'已采集',partial:'已收录部分数据',missing:'暂缺来源'};
 export function EvidenceTable({section:s}:{section:BaselineSection}){
  if(s.id==='leader-theme-factor')return <ThemeFactorModule section={s}/>;
- return <details id={s.id==='crowding-watch'?'crowding-leader-watch':undefined} className={`baseline-module${s.id==='crowding-watch'?' baseline-crowding':''}`} open={['market','prior-themes','new-stocks','crowding-watch','second-wave-watch'].includes(s.id)}>
+ return <details id={s.id==='crowding-watch'?'crowding-leader-watch':undefined} className={`baseline-module${s.id==='crowding-watch'?' baseline-crowding':''}${s.id==='second-wave-watch'?' baseline-second-wave':''}`} open={['market','prior-themes','new-stocks','crowding-watch','second-wave-watch'].includes(s.id)}>
   <summary><span>{s.title}</span><small className={s.status}>{statusLabel[s.status]}</small></summary>
   <div className="baseline-module-body"><p>{s.note}</p>
    {s.id==='second-wave-watch'&&!!s.focus?.length&&<div className="wave-priority"><h4>重点关注 · 断板次日反包涨停</h4><ul>{s.focus.map(r=><li key={r.code}><div><strong>{r.name}</strong><span>{r.code}</span><b>{r.date} 反包</b></div><p>{r.height}板 → {r.entry} 断板 → 下一交易日封板，收盘 {r.close}。{r.recovered===null?'收复前板情况待核。':`${r.recovered?'已':'尚未'}收复前板收盘 ${r.boardClose}。`}</p><small>保留已发生的形态；继续核对主动性、题材带动与后续承接。</small></li>)}</ul></div>}

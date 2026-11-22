@@ -5,6 +5,7 @@ import {parseLimitUps} from './duanxianxia.mjs';
 import {buildCrowdingWatch,crowdingSection,parseAdjustedSeries,parseTencentAdjusted,parseSohuHistory} from './crowding-watch.mjs';
 import {buildThemeFactor} from './theme-factor.mjs';
 import {attachWave} from './second-wave.mjs';
+import {collectWaveThemeStrength} from './second-wave-themes.mjs';
 
 export const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
 export function emotionValue(payload,date,key){
@@ -295,6 +296,10 @@ export async function collectBaseline({from,to,now=new Date(),cacheDir}={}){
  const result={version:1,updatedAt:fetchedAt,calendarSource:calendarUrl,sessions,days,errors,crowdingWatch,crowdingAdjusted:adjusted,themeFactorInputs,quoteCache:{stocks:trim({...savedQuotes.stocks,...bars}),indices:trim({...savedQuotes.indices,...indices})}};
  restoreDatedEvidence(result,context);
  result.secondWave=old.secondWave||{};
+ result.secondWaveThemes=old.secondWaveThemes||{};
+ attachWave(result,{from:dates[0],end:dates.at(-1)});
+ result.secondWaveThemes=await collectWaveThemeStrength(result,{from:dates[0],end:dates.at(-1),post,fetchedAt,counts:context.themes});
+ errors.push(...result.secondWaveThemes.errors);
  attachWave(result,{from:dates[0],end:dates.at(-1)});
  for(const path of [file,'docs/data/daily-baseline.json']){await fs.mkdir(path.slice(0,path.lastIndexOf('/')),{recursive:true});await fs.writeFile(path,JSON.stringify(result))}
  return result;

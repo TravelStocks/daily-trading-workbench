@@ -1,4 +1,5 @@
 // Archive each session so historical views never use the following day's signals.
+import {waveThemeEvidence} from './second-wave-themes.mjs';
 const start='2026-11-09';
 const positive=n=>Number.isFinite(n)&&n>0;
 const complete=p=>p?.complete===true&&Array.isArray(p.stocks);
@@ -84,12 +85,18 @@ export function attachWave(base,{from=start,end=base.sessions.at(-1)}={}){
   snapshots[date]=s;
   const active=Object.values(s.pool).sort((a,b)=>(b.reversalEvent?.date||'').localeCompare(a.reversalEvent?.date||'')||b.entry.localeCompare(a.entry)||a.code.localeCompare(b.code));
   const focus=active.filter(r=>r.reversalEvent).map(r=>({code:r.code,name:r.name,date:r.reversalEvent.date,entry:r.entry,height:r.height,close:r.reversalEvent.close,boardClose:r.reversalEvent.boardClose,recovered:r.reversalEvent.recovered}));
-  const row=(r,action)=>[r.name+' '+r.code,r.reversalEvent?`${action==='移出'?'历史信号':'重点'} · ${r.reversalEvent.date} 次日反包`:'普通观察',r.height,r.entry,action,r.close,r.bounds?`${r.bounds.low}–${r.bounds.high}（${r.bounds.from} 至 ${r.bounds.to}）`:'尚无可核平台',r.status,r.reversal];
+  const themeEvidence=Object.fromEntries([...active,...s.removed].map(r=>[r.code,waveThemeEvidence(base,r,date)]));
+  const row=(r,action)=>[r.name+' '+r.code,r.reversalEvent?`${action==='移出'?'历史信号':'重点'} · ${r.reversalEvent.date} 次日反包`:'普通观察',themeEvidence[r.code].text,r.height,r.entry,action,r.close,r.bounds?`${r.bounds.low}–${r.bounds.high}（${r.bounds.from} 至 ${r.bounds.to}）`:'尚无可核平台',r.status,r.reversal];
   s.sources=[...new Set([...s.sources,...active.flatMap(r=>r.reversalEvent?.sources||[])])];
-  const section={id:'second-wave-watch',title:'龙头二波 · 每日观察池',columns:['标的','重点信号','首波连板','断板日','名单变化','收盘','参考平台','平台突破路径','断板反包路径'],rows:[...active.map(r=>row(r,s.added.includes(r.code)?'新增':'留池')),...s.removed.map(r=>row(r,'移出'))],focus,status:s.missing.length?'partial':'complete',sources:s.sources,note:`新增 ${s.added.length} · 留池共 ${Object.keys(s.pool).length} · 重点 ${focus.length} · 今日移出 ${s.removed.length}。三板及以上断板后，下一个交易日收盘封涨停即列重点，收复前板与否另记，不等平台形成。已出现的反包日期持续保留，移出后不列活跃重点。参考平台以断板起连续三个交易日区间有交集时的总上下沿固定；收盘跌破下沿移出。价格形态不确认主动性、带动性或买点。`+(s.missing.length?' 待核：'+s.missing.join('；'):'')};
+  const themeMissing=Object.values(themeEvidence).filter(t=>t.missing).length;
+  const section={id:'second-wave-watch',title:'龙头二波 · 每日观察池',
+   columns:['标的','重点信号','题材强度','首波连板','断板日','名单变化','收盘','参考平台','平台突破路径','断板反包路径'],
+   rows:[...active.map(r=>row(r,s.added.includes(r.code)?'新增':'留池')),...s.removed.map(r=>row(r,'移出'))],focus,themeEvidence,
+   status:s.missing.length||themeMissing?'partial':'complete',sources:[...new Set([...s.sources,...Object.values(themeEvidence).flatMap(t=>t.sources)])],
+   note:`新增 ${s.added.length} · 留池共 ${Object.keys(s.pool).length} · 重点 ${focus.length} · 今日移出 ${s.removed.length}。断板次日封板重点持续保留；参考平台收盘跌破移出。题材沿用首波归属，涨停家数取同日复盘分组，缺项用已标注的同花顺同名概念统计；强度取短线侠。括号为较前一交易日变化，不同口径不比较，未单列不算零。家数与强度同步回升仅供二次爆发观察，不确认买点。`+(s.missing.length?' 待核：'+s.missing.join('；'):'')+(themeMissing?` ${themeMissing} 只题材归属或当日强度缺少来源。`:'')};
   day.sections=[...day.sections.filter(x=>x.id!==section.id),section];
   day.gaps=day.gaps.filter(x=>x.id!==section.id);
-  if(s.missing.length)day.gaps.push({id:section.id,title:section.title,status:'partial',note:s.missing.join('；')});
+  if(s.missing.length||themeMissing)day.gaps.push({id:section.id,title:section.title,status:'partial',note:[...s.missing,...(themeMissing?[`${themeMissing} 只题材归属或当日强度缺少来源`]:[])].join('；')});
   day.status=day.gaps.length?'partial':'complete';
  }
  base.secondWave=snapshots;
