@@ -12,7 +12,7 @@ export default function SecondWavePool(){
  const [rows,setRows]=useState<Row[]>(()=>{try{const data=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(data)?data.filter(r=>r&&['name','mode','note'].every(k=>typeof r[k]==='string')):[]}catch{return []}});
  const [name,setName]=useState(''),[mode,setMode]=useState('平台突破'),[note,setNote]=useState(''),[msg,setMsg]=useState('');
  function save(next:Row[],message:string){setRows(next);try{localStorage.setItem(key,JSON.stringify(next));setMsg(message)}catch{setMsg('当前浏览器无法保存，记录仅在本次打开时保留。')}}
- return <section id="second-wave-pool" className="handbook-panel wave-pool"><h2>龙头二波 · 每日观察池</h2><p>收盘后把三板及以上刚断板的标的单列，逐日复核。入池只是观察，不代表已经出现买点。</p><dl><dt>平台突破</dt><dd>标出平台上下沿和前高；跌破平台就移出。主动突破且核心地位仍在，才符合我的入场预案。</dd><dt>断板反包</dt><dd>东方海洋是历史案例。没有平台也可以观察：断板后能否主动收复失地、带动同梯队？如果只是跟着别人拉，不当作龙头二波。</dd></dl>
+ return <section id="second-wave-pool" className="handbook-panel wave-pool"><h2>龙头二波 · 每日观察池</h2><p>收盘后把三板及以上刚断板的标的单列，逐日复核。入池只是观察，不代表已经出现买点。</p><dl><dt>平台突破</dt><dd>标出平台上下沿和前高；跌破平台就移出。主动突破且核心地位仍在，才符合我的入场预案。</dd><dt>断板次日反包 · 重点</dt><dd>断板后的下一个交易日收盘封涨停，立刻列为重点，不等平台形成；是否收复前板收盘价单独核对。反包日期在后续留池时持续显示，再看主动性、同梯队带动和后续承接，不把形态直接当买点。</dd></dl>
  <h3>收盘自动名单{latest?' · '+latest:''}</h3>{snapshot?<EvidenceTable section={snapshot}/>:<p>尚未取得当日收盘名单。</p>}
  <h3>我的补充笔记</h3><form onSubmit={e=>{e.preventDefault();const n=name.trim();if(!n)return;const row={name:n,mode,note:note.trim()};save([...rows.filter(r=>r.name!==n),row],'已保存观察记录');setName('');setNote('')}}>
  <label>标的<input required maxLength={32} value={name} onChange={e=>setName(e.target.value)}/></label><label>观察路径<select value={mode} onChange={e=>setMode(e.target.value)}><option>平台突破</option><option>断板反包</option></select></label>
