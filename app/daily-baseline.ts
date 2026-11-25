@@ -12,7 +12,8 @@ export function readBaseline(){
   loaded=Date.now();
   const local=`${import.meta.env.BASE_URL}data/daily-baseline.json`;
   // Scheduled data commits can precede the next Pages deployment.
-  const urls=location.hostname==='travelstocks.github.io'?['https://raw.githubusercontent.com/TravelStocks/daily-trading-workbench/main/public/data/daily-baseline.json',local]:[local];
+  const cacheVersion=Math.floor(Date.now()/120000);
+  const urls=location.hostname==='travelstocks.github.io'?[`https://raw.githubusercontent.com/TravelStocks/daily-trading-workbench/main/public/data/daily-baseline.json?v=${cacheVersion}`,local]:[local];
   pending=(async()=>{for(const url of urls){try{
    const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.timeout(15000)});
    if(!r.ok)continue;
